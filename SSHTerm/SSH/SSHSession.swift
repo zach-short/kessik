@@ -40,7 +40,7 @@ final class SSHSession {
     @ObservationIgnored private let link: MacLink?
     /// Typed into the shell once it opens.
     @ObservationIgnored private var startCommand: String?
-    /// The tmux session a reconnect attaches to again.
+    /// The tmux session a reconnect attaches to again. Without one, a reconnect opens a plain shell.
     @ObservationIgnored private let tmuxName: String?
     @ObservationIgnored private var probing = false
     @ObservationIgnored private var size = (cols: 80, rows: 24)
@@ -54,7 +54,7 @@ final class SSHSession {
         self.tmuxName = nil
     }
 
-    init(link: MacLink, startCommand: String, tmuxName: String) {
+    init(link: MacLink, startCommand: String, tmuxName: String?) {
         self.host = link.host
         self.link = link
         self.startCommand = startCommand
@@ -93,7 +93,8 @@ final class SSHSession {
         generation += 1
         state = .needsPassword
         if let link {
-            if let tmuxName { startCommand = Tmux.attachCommand(tmuxName) }
+            // A snippet command does not run again on its own after a drop.
+            startCommand = tmuxName.map(Tmux.attachCommand)
             open { try await link.ensureConnected(verify: true) }
         } else if Credentials.available(for: host) {
             connect(password: nil)

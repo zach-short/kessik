@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 struct Host: Identifiable, Codable, Hashable {
     enum Status: String, Codable {
@@ -84,15 +85,47 @@ struct TmuxSession: Identifiable, Hashable {
 final class AppStore {
     var hosts: [Host]
     var sessions: [TmuxSession]
+    /// Kept grouped by kind, in the order Settings shows them. The app root saves each change.
+    var snippets: [Snippet]
 
-    init(hosts: [Host] = [], sessions: [TmuxSession] = []) {
+    init(hosts: [Host] = [], sessions: [TmuxSession] = [], snippets: [Snippet] = SavedSnippets.defaults) {
         self.hosts = hosts
         self.sessions = sessions
+        self.snippets = snippets
     }
 
     /// The Mac from Settings, or no hosts on a fresh install. Sessions come from the Mac.
     convenience init() {
-        self.init(hosts: SavedMac.load().map { [$0] } ?? [], sessions: [])
+        self.init(hosts: SavedMac.load().map { [$0] } ?? [], sessions: [], snippets: SavedSnippets.load())
+    }
+
+    func snippets(_ kind: Snippet.Kind) -> [Snippet] {
+        snippets.filter { $0.kind == kind }
+    }
+
+    /// Adds a new snippet at the end of its kind, or replaces the one with the same id.
+    func save(_ snippet: Snippet) {
+        if let index = snippets.firstIndex(where: { $0.id == snippet.id }) {
+            snippets[index] = snippet
+        } else {
+            snippets.append(snippet)
+        }
+        regroup()
+    }
+
+    func delete(_ snippet: Snippet) {
+        snippets.removeAll { $0.id == snippet.id }
+    }
+
+    /// Moves within one kind. `source` and `destination` index into `snippets(kind)`.
+    func move(_ kind: Snippet.Kind, from source: IndexSet, to destination: Int) {
+        var moved = snippets(kind)
+        moved.move(fromOffsets: source, toOffset: destination)
+        snippets = Snippet.Kind.allCases.flatMap { $0 == kind ? moved : snippets($0) }
+    }
+
+    private func regroup() {
+        snippets = Snippet.Kind.allCases.flatMap(snippets)
     }
 
     static let preview = AppStore(
@@ -107,6 +140,9 @@ final class AppStore {
                         created: .now.addingTimeInterval(-60 * 90)),
             TmuxSession(name: "dev-server", path: "~/Projects/site", windows: 1, attached: true,
                         created: .now.addingTimeInterval(-60 * 60 * 5)),
+        ],
+        snippets: SavedSnippets.defaults + [
+            Snippet(label: "Git glance", text: "git status --short && git worktree list", kind: .command),
         ]
     )
 }

@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// A terminal to open from this tab: the command it types, and the tmux session name for the status line.
+/// A terminal to open from this tab: the command it types, the status line title, and the tmux
+/// session a reconnect attaches to. A snippet command has no tmux session.
 struct SessionLaunch: Identifiable {
     let id = UUID()
     var command: String
     var title: String
+    var tmuxName: String?
 }
 
 struct SessionsView: View {
@@ -17,6 +19,7 @@ struct SessionsView: View {
     @State private var showPicker = false
     @State private var launch: SessionLaunch?
     @State private var pendingKill: TmuxSession?
+    @State private var pendingSnippet: Snippet?
 
     var body: some View {
         NavigationStack {
@@ -51,11 +54,11 @@ struct SessionsView: View {
                 FolderPicker(link: link, sessions: store.sessions) { path in
                     showPicker = false
                     let name = Tmux.sessionName(for: path)
-                    launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path), title: name)
+                    launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path), title: name, tmuxName: name)
                 }
             }
             .fullScreenCover(item: $launch, onDismiss: { Task { await refresh() } }) { launch in
-                TerminalScreen(link: link, command: launch.command, title: launch.title)
+                TerminalScreen(link: link, command: launch.command, title: launch.title, tmuxName: launch.tmuxName)
             }
             .confirmationDialog(
                 "Kill \(pendingKill?.name ?? "")?",
@@ -66,6 +69,18 @@ struct SessionsView: View {
                 Button("Kill session", role: .destructive) { Task { await kill(session) } }
             } message: { _ in
                 Text("Everything running in it stops, including Claude and dev servers.")
+            }
+            .confirmationDialog(
+                "Run \(pendingSnippet?.label ?? "")?",
+                isPresented: Binding(get: { pendingSnippet != nil }, set: { if !$0 { pendingSnippet = nil } }),
+                titleVisibility: .visible,
+                presenting: pendingSnippet
+            ) { snippet in
+                Button("Run on \(link.host.name)") {
+                    launch = SessionLaunch(command: snippet.text, title: snippet.label)
+                }
+            } message: { snippet in
+                Text(snippet.text)
             }
         }
     }
@@ -99,9 +114,18 @@ struct SessionsView: View {
 
         ForEach(store.sessions) { session in
             SessionRow(session: session) {
-                launch = SessionLaunch(command: Tmux.attachCommand(session.name), title: session.name)
+                launch = SessionLaunch(command: Tmux.attachCommand(session.name), title: session.name, tmuxName: session.name)
             } onKill: {
                 pendingKill = session
+            }
+        }
+
+        let commands = store.snippets(.command)
+        if !commands.isEmpty {
+            SectionLabel("Snippets")
+                .padding(.top, 8)
+            ForEach(commands) { snippet in
+                SnippetRow(snippet: snippet) { pendingSnippet = snippet }
             }
         }
     }
@@ -281,6 +305,44 @@ struct NewClaudeSessionButton: View {
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
                     .strokeBorder(Theme.accent.opacity(0.25))
             )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// A saved command. Tapping it asks first, then runs it in a new terminal on the Mac.
+struct SnippetRow: View {
+    var snippet: Snippet
+    var onRun: () -> Void
+
+    var body: some View {
+        Button(action: onRun) {
+            HStack(spacing: 14) {
+                Image(systemName: "bolt")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 40, height: 40)
+                    .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(snippet.label)
+                        .font(.headline)
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    Text(snippet.text)
+                        .font(Theme.mono)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "play.fill")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            .padding(14)
+            .card()
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

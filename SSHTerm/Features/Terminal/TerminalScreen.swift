@@ -4,28 +4,39 @@ import SwiftUI
 struct TerminalScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(AppStore.self) private var store
     @AppStorage(SettingsKey.terminalFontSize) private var fontSize = 13.0
     @AppStorage(SettingsKey.rememberPasswords) private var remember = true
+    @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
     @State private var session: SSHSession
     @State private var password = ""
+    @State private var replyCount = 0
+    @State private var typingReply = false
     @FocusState private var passwordFocused: Bool
     private let title: String?
+    private let tmuxName: String?
 
     init(host: Host) {
         _session = State(initialValue: SSHSession(host: host))
         title = nil
+        tmuxName = nil
     }
 
-    /// Opens a shell on the Sessions tab's connection and types `command` into it. Closes when
-    /// tmux detaches. After a drop, Reconnect attaches to the tmux session named `title` again.
-    init(link: MacLink, command: String, title: String) {
-        _session = State(initialValue: SSHSession(link: link, startCommand: command, tmuxName: title))
+    /// Opens a shell on the Sessions tab's connection and types `command` into it. A tmux command
+    /// closes the terminal when tmux detaches, and after a drop Reconnect attaches to `tmuxName`
+    /// again. `title` goes in the status line.
+    init(link: MacLink, command: String, title: String, tmuxName: String?) {
+        _session = State(initialValue: SSHSession(link: link, startCommand: command, tmuxName: tmuxName))
         self.title = title
+        self.tmuxName = tmuxName
     }
 
     var body: some View {
         VStack(spacing: 0) {
             statusLine
+            if !store.snippets(.reply).isEmpty {
+                replyBar
+            }
             ZStack {
                 Theme.background
                 TerminalHostView(session: session, fontSize: fontSize)
@@ -94,6 +105,49 @@ struct TerminalScreen: View {
         .padding(.vertical, 8)
     }
 
+    // MARK: Replies
+
+    /// One tap types a saved reply, such as "continue", into the shell or Claude session.
+    private var replyBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(store.snippets(.reply)) { snippet in
+                    Button { type(snippet) } label: {
+                        Text(snippet.label)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(Theme.surfaceRaised, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Types \(snippet.text) and Return")
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+        .padding(.bottom, 8)
+        .disabled(session.state != .connected)
+        .opacity(session.state == .connected ? 1 : 0.4)
+        .sensoryFeedback(trigger: replyCount) { _, _ in hapticsEnabled ? .impact(weight: .light) : nil }
+    }
+
+    private func type(_ snippet: Snippet) {
+        // A double tap would type the text twice before either Return.
+        guard !typingReply else { return }
+        typingReply = true
+        session.send(snippet.text)
+        replyCount += 1
+        // Claude Code can read one burst of text as a paste, where Return adds a new line instead
+        // of sending. A short pause makes Return a key press of its own.
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            session.send("\r")
+            typingReply = false
+        }
+    }
+
     private var dotStatus: Host.Status {
         switch session.state {
         case .connected: .online
@@ -138,7 +192,7 @@ struct TerminalScreen: View {
                         retry: "Try again")
         case .dropped(let message):
             messageCard(icon: "wifi.exclamationmark", title: "Connection lost", message: message,
-                        retry: title.map { "Reconnect to \($0)" } ?? "Reconnect")
+                        retry: tmuxName.map { "Reconnect to \($0)" } ?? "Reconnect")
         case .disconnected:
             VStack {
                 Spacer()

@@ -18,6 +18,7 @@ struct SSHTermApp: App {
                 .environment(link)
                 .preferredColorScheme(.dark)
                 .tint(Theme.accent)
+                .onChange(of: store.snippets) { _, snippets in SavedSnippets.save(snippets) }
         }
     }
 }

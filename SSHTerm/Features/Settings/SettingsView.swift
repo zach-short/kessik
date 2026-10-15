@@ -9,6 +9,7 @@ enum SettingsKey {
 }
 
 struct SettingsView: View {
+    @Environment(AppStore.self) private var store
     @AppStorage(SettingsKey.terminalFontSize) private var fontSize = 13.0
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
 
@@ -34,6 +35,16 @@ struct SettingsView: View {
 
                 Section("Feedback") {
                     Toggle("Haptics on key taps", isOn: $hapticsEnabled)
+                }
+
+                Section {
+                    NavigationLink {
+                        SnippetsEditor()
+                    } label: {
+                        LabeledContent("Snippets", value: "\(store.snippets.count)")
+                    }
+                } footer: {
+                    Text("Saved replies and commands you run with one tap.")
                 }
 
                 KeySection()
