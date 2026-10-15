@@ -7,17 +7,40 @@ options:
 configFiles:
   Debug: Config/Base.xcconfig
   Release: Config/Base.xcconfig
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: 1.19.0
+  # Pinned: 0.12.1 moved NIOSSH to a third-party fork. 0.12.0 uses the maintainer's fork.
+  Citadel:
+    url: https://github.com/orlandos-nl/Citadel
+    exactVersion: 0.12.0
+  # Same package Citadel 0.12.0 uses, declared so the app can import NIOSSH for host key checks.
+  swift-nio-ssh:
+    url: https://github.com/Joannis/swift-nio-ssh
+    minorVersion: 0.3.4
+  swift-nio:
+    url: https://github.com/apple/swift-nio
+    from: 2.81.0
 targets:
   SSHTerm:
     type: application
     platform: iOS
     sources: [SSHTerm]
+    dependencies:
+      - package: SwiftTerm
+      - package: Citadel
+      - package: swift-nio-ssh
+        product: NIOSSH
+      - package: swift-nio
+        product: NIOCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(SSHTERM_BUNDLE_ID)
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: SSHTerm
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: SSHTerm connects to computers on your local network over SSH.
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight

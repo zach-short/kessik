@@ -3,17 +3,24 @@ import SwiftUI
 struct HostsView: View {
     @Environment(AppStore.self) private var store
     @State private var command = ""
+    @State private var activeHost: Host?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    CommandBar(text: $command)
-                        .padding(.bottom, 8)
+                    CommandBar(text: $command, prompt: "user@host to connect…") {
+                        if let host = Host(quickConnect: command) {
+                            activeHost = host
+                            command = ""
+                        }
+                    }
+                    .padding(.bottom, 8)
 
                     SectionLabel("Hosts")
                     ForEach(store.hosts) { host in
-                        HostCard(host: host)
+                        Button { activeHost = host } label: { HostCard(host: host) }
+                            .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -22,6 +29,9 @@ struct HostsView: View {
             .scrollContentBackground(.hidden)
             .background(Theme.background)
             .navigationTitle("Hosts")
+            .fullScreenCover(item: $activeHost) { host in
+                TerminalScreen(host: host)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Add host", systemImage: "plus") {}

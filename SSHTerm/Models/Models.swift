@@ -14,7 +14,23 @@ struct Host: Identifiable, Codable, Hashable {
     var lastConnected: Date?
     var status: Status = .unknown
 
-    var address: String { "\(username)@\(hostname)" }
+    var address: String { port == 22 ? "\(username)@\(hostname)" : "\(username)@\(hostname):\(port)" }
+}
+
+extension Host {
+    /// Parses `user@host` or `user@host:port` from the command bar.
+    init?(quickConnect text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        let parts = trimmed.split(separator: "@", maxSplits: 1)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+        var hostname = String(parts[1])
+        var port = 22
+        if let colon = hostname.lastIndex(of: ":"), let p = Int(hostname[hostname.index(after: colon)...]) {
+            port = p
+            hostname = String(hostname[..<colon])
+        }
+        self.init(name: hostname, hostname: hostname, port: port, username: String(parts[0]))
+    }
 }
 
 /// A tmux session on the Mac, as reported by `tmux ls`.
