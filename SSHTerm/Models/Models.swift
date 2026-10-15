@@ -15,6 +15,43 @@ struct Host: Identifiable, Codable, Hashable {
     var status: Status = .unknown
 
     var address: String { port == 22 ? "\(username)@\(hostname)" : "\(username)@\(hostname):\(port)" }
+
+    /// No Mac set yet. The Sessions tab asks for one in Settings.
+    static let unset = Host(name: "Mac", hostname: "", username: "")
+
+    var isSet: Bool { !hostname.isEmpty && !username.isEmpty }
+
+    /// Same login target: the Keychain password and host key belong to it.
+    func sameLogin(as other: Host) -> Bool {
+        hostname == other.hostname && port == other.port && username == other.username
+    }
+}
+
+/// The Mac set in Settings, which the Sessions tab and the Hosts list use. Passwords stay in the Keychain.
+enum SavedMac {
+    private static let key = "savedMac"
+
+    static func load() -> Host? {
+        let defaults = UserDefaults.standard
+        if let data = defaults.data(forKey: key), let host = try? JSONDecoder().decode(Host.self, from: data) {
+            return host
+        }
+        // The Sessions connect card kept a typed address before Settings had a Mac section.
+        if let typed = defaults.string(forKey: SettingsKey.sessionsAddress), var host = Host(quickConnect: typed) {
+            host.name = "Mac"
+            save(host)
+            return host
+        }
+        return nil
+    }
+
+    static func save(_ host: Host) {
+        var host = host
+        host.status = .unknown
+        if let data = try? JSONEncoder().encode(host) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
 }
 
 extension Host {
@@ -53,9 +90,9 @@ final class AppStore {
         self.sessions = sessions
     }
 
-    /// Placeholder hosts until the settings screen (build step 7). Sessions come from the Mac.
+    /// The Mac from Settings, or no hosts on a fresh install. Sessions come from the Mac.
     convenience init() {
-        self.init(hosts: AppStore.preview.hosts, sessions: [])
+        self.init(hosts: SavedMac.load().map { [$0] } ?? [], sessions: [])
     }
 
     static let preview = AppStore(

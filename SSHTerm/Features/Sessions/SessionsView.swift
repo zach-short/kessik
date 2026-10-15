@@ -138,81 +138,101 @@ struct SessionsView: View {
     }
 }
 
-/// Password prompt for the Sessions tab's connection.
+/// Password prompt for the Sessions tab's connection. The Mac itself is set in Settings.
 struct ConnectCard: View {
     var link: MacLink
-    @AppStorage(SettingsKey.sessionsAddress) private var address = ""
+    @Environment(\.showTab) private var showTab
     @AppStorage(SettingsKey.rememberPasswords) private var remember = true
     @State private var password = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                StatusDot(status: link.state == .connecting ? .unknown : .unreachable)
-                TextField("user@host", text: $address)
-                    .font(Theme.mono)
-                    .foregroundStyle(Theme.textPrimary)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
+            if link.host.isSet {
+                loginForm
+            } else {
+                setupPrompt
             }
-            .padding(.horizontal, 12)
-            .frame(height: 44)
-            .card()
-            Text("Connect to see tmux sessions and start Claude in a repo.")
-                .font(.subheadline)
-                .foregroundStyle(Theme.textSecondary)
-            if case .failed(let message) = link.state {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.warning)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            SecureField("Password", text: $password)
-                .textContentType(.password)
-                .submitLabel(.go)
-                .onSubmit(connect)
-                .padding(.horizontal, 12)
-                .frame(height: 44)
-                .card()
-            Button(action: connect) {
-                Group {
-                    if link.state == .connecting {
-                        ProgressView()
-                    } else {
-                        Text("Connect")
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!canConnect)
-            PasswordSaveToggle(remember: $remember)
         }
         .padding(16)
         .card()
         .onAppear {
-            if address.isEmpty {
-                address = link.host.address
-            } else if let host = parsedHost {
-                link.host = host
-                link.connectSavedOnce()
-            }
+            if link.host.isSet { link.connectSavedOnce() }
         }
     }
 
-    private var parsedHost: Host? { Host(quickConnect: address) }
+    private var setupPrompt: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("No Mac set", systemImage: "laptopcomputer")
+                .font(.headline)
+                .foregroundStyle(Theme.textPrimary)
+            Text("Add the Mac's hostname and username in Settings. Then connect here to see tmux sessions.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { showTab(.settings) } label: {
+                Text("Open Settings").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+    }
+
+    @ViewBuilder
+    private var loginForm: some View {
+        HStack(spacing: 10) {
+            StatusDot(status: link.state == .connecting ? .unknown : .unreachable)
+            Text(link.host.address)
+                .font(Theme.mono)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Button("Edit") { showTab(.settings) }
+                .font(.subheadline)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .card()
+        Text("Connect to see tmux sessions and start Claude in a repo.")
+            .font(.subheadline)
+            .foregroundStyle(Theme.textSecondary)
+        if case .failed(let message) = link.state {
+            Label(message, systemImage: "exclamationmark.triangle")
+                .font(.subheadline)
+                .foregroundStyle(Theme.warning)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        SecureField("Password", text: $password)
+            .textContentType(.password)
+            .submitLabel(.go)
+            .onSubmit(connect)
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .card()
+        Button(action: connect) {
+            Group {
+                if link.state == .connecting {
+                    ProgressView()
+                } else {
+                    Text("Connect")
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(!canConnect)
+        PasswordSaveToggle(remember: $remember)
+    }
 
     /// An empty password still connects when the key or a saved password can log in.
     private var canConnect: Bool {
-        guard let host = parsedHost, link.state != .connecting else { return false }
-        return !password.isEmpty || Credentials.available(for: host)
+        guard link.host.isSet, link.state != .connecting else { return false }
+        return !password.isEmpty || Credentials.available(for: link.host)
     }
 
     private func connect() {
-        guard canConnect, let host = parsedHost else { return }
-        link.host = host
+        guard canConnect else { return }
         link.connect(password: password.isEmpty ? nil : password, remember: remember)
         password = ""
     }

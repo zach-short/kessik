@@ -37,8 +37,8 @@ final class MacLink {
     }
 
     private(set) var state: State = .needsPassword
-    /// Changed from the connect card until the settings screen lands (build step 7).
-    var host: Host
+    /// The Mac from Settings. Change it with `use(_:)`.
+    private(set) var host: Host
 
     @ObservationIgnored private(set) var client: SSHClient?
     @ObservationIgnored private var connecting: Task<SSHClient, Error>?
@@ -105,6 +105,16 @@ final class MacLink {
             probing = false
             if !alive { drop(gen: gen) }
         }
+    }
+
+    /// Switches to the Mac saved in Settings. A different login closes the open connection,
+    /// and the terminals that share it, because they belong to the old Mac.
+    func use(_ newHost: Host) {
+        let changed = !newHost.sameLogin(as: host)
+        host = newHost
+        guard changed else { return }
+        disconnect()
+        triedSaved = false
     }
 
     func disconnect() {

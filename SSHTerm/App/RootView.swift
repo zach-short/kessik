@@ -22,6 +22,11 @@ enum AppTab: String, CaseIterable, Identifiable {
     }
 }
 
+extension EnvironmentValues {
+    /// Switches the bottom tab, for links such as "Set up in Settings".
+    @Entry var showTab: (AppTab) -> Void = { _ in }
+}
+
 struct RootView: View {
     @Environment(MacLink.self) private var link
     @Environment(\.scenePhase) private var scenePhase
@@ -37,6 +42,7 @@ struct RootView: View {
             case .settings: SettingsView()
             }
         }
+        .environment(\.showTab) { tab = $0 }
         .safeAreaInset(edge: .bottom) {
             PillTabBar(selection: $tab)
                 .padding(.bottom, 4)

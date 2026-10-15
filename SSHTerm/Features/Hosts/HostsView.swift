@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HostsView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.showTab) private var showTab
     @State private var command = ""
     @State private var activeHost: Host?
 
@@ -18,6 +19,17 @@ struct HostsView: View {
                     .padding(.bottom, 8)
 
                     SectionLabel("Hosts")
+                    if store.hosts.isEmpty {
+                        Button { showTab(.settings) } label: {
+                            Label("Add your Mac in Settings", systemImage: "plus.circle")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(14)
+                                .card()
+                        }
+                        .buttonStyle(.plain)
+                    }
                     ForEach(store.hosts) { host in
                         Button { activeHost = host } label: { HostCard(host: host) }
                             .buttonStyle(.plain)

@@ -8,7 +8,7 @@ struct SSHTermApp: App {
     init() {
         let store = AppStore()
         _store = State(initialValue: store)
-        _link = State(initialValue: MacLink(host: store.hosts[0]))
+        _link = State(initialValue: MacLink(host: store.hosts.first ?? .unset))
     }
 
     var body: some Scene {
