@@ -1,9 +1,9 @@
 import SwiftUI
-import Citadel
 
 /// Full-screen terminal for one host: password prompt, live shell, and clear error states.
 struct TerminalScreen: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SettingsKey.terminalFontSize) private var fontSize = 13.0
     @AppStorage(SettingsKey.rememberPasswords) private var remember = true
     @State private var session: SSHSession
@@ -16,9 +16,10 @@ struct TerminalScreen: View {
         title = nil
     }
 
-    /// Opens a shell on an existing connection and types `command` into it. Closes when the shell ends.
-    init(host: Host, client: SSHClient, command: String, title: String) {
-        _session = State(initialValue: SSHSession(host: host, sharedClient: client, startCommand: command))
+    /// Opens a shell on the Sessions tab's connection and types `command` into it. Closes when
+    /// tmux detaches. After a drop, Reconnect attaches to the tmux session named `title` again.
+    init(link: MacLink, command: String, title: String) {
+        _session = State(initialValue: SSHSession(link: link, startCommand: command, tmuxName: title))
         self.title = title
     }
 
@@ -28,7 +29,7 @@ struct TerminalScreen: View {
             ZStack {
                 Theme.background
                 TerminalHostView(session: session, fontSize: fontSize)
-                    .opacity(session.state == .connected || session.state == .disconnected ? 1 : 0)
+                    .opacity(terminalOpacity)
                 overlay
             }
         }
@@ -41,6 +42,16 @@ struct TerminalScreen: View {
             }
         }
         .onDisappear { session.disconnect() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { session.checkAlive() }
+        }
+        .onChange(of: NetworkMonitor.shared.changes) { session.checkAlive() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                if UIApplication.shared.applicationState == .active { session.checkAlive() }
+            }
+        }
         .onChange(of: session.state) { _, state in
             // tmux detached or exited: go back to the session list.
             if state == .disconnected, !session.ownsClient { dismiss() }
@@ -86,7 +97,7 @@ struct TerminalScreen: View {
     private var dotStatus: Host.Status {
         switch session.state {
         case .connected: .online
-        case .failed, .disconnected: .unreachable
+        case .failed, .dropped, .disconnected: .unreachable
         default: .unknown
         }
     }
@@ -97,7 +108,17 @@ struct TerminalScreen: View {
         case .connecting: "Connecting…"
         case .connected: "Connected"
         case .disconnected: "Disconnected"
+        case .dropped: "Connection lost"
         case .failed: "Failed"
+        }
+    }
+
+    /// The last screen stays visible, dimmed, behind the reconnect card.
+    private var terminalOpacity: Double {
+        switch session.state {
+        case .connected, .disconnected: 1
+        case .dropped: 0.3
+        default: 0
         }
     }
 
@@ -113,11 +134,15 @@ struct TerminalScreen: View {
                 .controlSize(.large)
                 .tint(Theme.textSecondary)
         case .failed(let message):
-            messageCard(icon: "exclamationmark.triangle", title: "Could not connect", message: message)
+            messageCard(icon: "exclamationmark.triangle", title: "Could not connect", message: message,
+                        retry: "Try again")
+        case .dropped(let message):
+            messageCard(icon: "wifi.exclamationmark", title: "Connection lost", message: message,
+                        retry: title.map { "Reconnect to \($0)" } ?? "Reconnect")
         case .disconnected:
             VStack {
                 Spacer()
-                Button("Reconnect", systemImage: "arrow.clockwise") { session.reset() }
+                Button("Reconnect", systemImage: "arrow.clockwise") { session.reconnect() }
                     .buttonStyle(.borderedProminent)
                     .padding(.bottom, 24)
             }
@@ -153,7 +178,7 @@ struct TerminalScreen: View {
         .onAppear { passwordFocused = true }
     }
 
-    private func messageCard(icon: String, title: String, message: String) -> some View {
+    private func messageCard(icon: String, title: String, message: String, retry: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: icon)
                 .font(.headline)
@@ -162,16 +187,22 @@ struct TerminalScreen: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Button(action: session.reconnect) {
+                Label(retry, systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             if session.ownsClient {
-                Button("Try again") { session.reset() }
-                    .buttonStyle(.borderedProminent)
+                Button("Enter password") { session.reset() }
+                    .frame(maxWidth: .infinity)
             } else {
                 Button("Close") { dismiss() }
-                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.background, in: RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
         .card()
         .padding(24)
     }

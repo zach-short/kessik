@@ -34,6 +34,8 @@ targets:
         product: NIOSSH
       - package: swift-nio
         product: NIOCore
+      - package: swift-nio
+        product: NIOPosix
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(SSHTERM_BUNDLE_ID)

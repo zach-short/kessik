@@ -3,6 +3,7 @@ import Observation
 import Citadel
 import NIOCore
 import NIOSSH
+import NIOPosix
 
 /// One interactive shell over SSH. Bytes from the Mac go to `onOutput`;
 /// keystrokes and resizes go in through `send` and `resize`, in order.
@@ -13,7 +14,11 @@ final class SSHSession {
         case needsPassword
         case connecting
         case connected
+        /// The shell ended on its own, such as `exit` or a tmux detach.
         case disconnected
+        /// The connection died while the shell was open.
+        case dropped(String)
+        /// The connection never opened.
         case failed(String)
     }
 
@@ -32,21 +37,32 @@ final class SSHSession {
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var client: SSHClient?
     /// Set when the terminal borrows the Sessions tab's connection. It is not closed here.
-    @ObservationIgnored private let sharedClient: SSHClient?
+    @ObservationIgnored private let link: MacLink?
     /// Typed into the shell once it opens.
-    @ObservationIgnored private let startCommand: String?
+    @ObservationIgnored private var startCommand: String?
+    /// The tmux session a reconnect attaches to again.
+    @ObservationIgnored private let tmuxName: String?
+    @ObservationIgnored private var probing = false
     @ObservationIgnored private var size = (cols: 80, rows: 24)
     /// Bumped on each connect so a late callback from an old connection is ignored.
     @ObservationIgnored private var generation = 0
 
-    init(host: Host, sharedClient: SSHClient? = nil, startCommand: String? = nil) {
+    init(host: Host) {
         self.host = host
-        self.sharedClient = sharedClient
-        self.startCommand = startCommand
-        if sharedClient != nil { state = .connecting }
+        self.link = nil
+        self.startCommand = nil
+        self.tmuxName = nil
     }
 
-    var ownsClient: Bool { sharedClient == nil }
+    init(link: MacLink, startCommand: String, tmuxName: String) {
+        self.host = link.host
+        self.link = link
+        self.startCommand = startCommand
+        self.tmuxName = tmuxName
+        state = .connecting
+    }
+
+    var ownsClient: Bool { link == nil }
 
     /// `password` nil means the key and the saved password only. `remember` saves a typed password
     /// once the login works, or removes a saved one.
@@ -65,9 +81,37 @@ final class SSHSession {
 
     /// Opens the shell on the shared connection.
     func start() {
-        guard let sharedClient else { return }
+        guard let link else { return }
         state = .needsPassword
-        open { sharedClient }
+        open { try await link.ensureConnected() }
+    }
+
+    /// One tap after a drop. A tmux terminal attaches to the same session again; a plain shell
+    /// logs in again with the key or saved password, or asks for the password.
+    func reconnect() {
+        disconnect()
+        generation += 1
+        state = .needsPassword
+        if let link {
+            if let tmuxName { startCommand = Tmux.attachCommand(tmuxName) }
+            open { try await link.ensureConnected(verify: true) }
+        } else if Credentials.available(for: host) {
+            connect(password: nil)
+        }
+    }
+
+    /// Checks that the Mac still answers, and ends the shell if it does not. The Sessions tab's
+    /// link checks shared connections, so this covers only a terminal's own connection.
+    func checkAlive() {
+        guard ownsClient, state == .connected, !probing, let client else { return }
+        probing = true
+        let gen = generation
+        Task { [weak self] in
+            let alive = await client.isAlive()
+            guard let self else { return }
+            probing = false
+            if !alive, gen == generation { Task { try? await client.close() } }
+        }
     }
 
     private func open(_ makeClient: @escaping @MainActor () async throws -> SSHClient) {
@@ -125,8 +169,10 @@ final class SSHSession {
                         group.cancelAll()
                     }
                 }
+                // The shell closed. If the connection went with it, the Mac or the network dropped it.
+                let alive = client.isConnected
                 if ownsClient { try? await client.close() }
-                self?.didEnd(error: nil, gen: gen)
+                self?.didEnd(error: alive ? nil : ConnectionLost(), gen: gen)
             } catch is CancellationError {
                 self?.didEnd(error: nil, gen: gen)
             } catch {
@@ -184,7 +230,12 @@ final class SSHSession {
         outbound = nil
         client = nil
         if let error {
-            state = .failed(Self.message(for: error, host: host))
+            // Once the shell was open, the cause is a lost connection, whatever error NIO reports.
+            if state == .connected {
+                state = .dropped(Self.message(for: ConnectionLost(), host: host))
+            } else {
+                state = .failed(Self.message(for: error, host: host))
+            }
         } else if state != .needsPassword {
             state = .disconnected
         }
@@ -192,21 +243,62 @@ final class SSHSession {
 
     /// Plain messages for the failures people actually hit.
     static func message(for error: Error, host: Host) -> String {
+        let name = host.hostname
+        if !NetworkMonitor.shared.isOnline {
+            return "This phone is offline. Connect to Wi-Fi or cellular data, then try again."
+        }
         if let error = error as? LocalizedError, let text = error.errorDescription {
             return text
         }
-        if case SSHClientError.allAuthenticationOptionsFailed = error {
+        switch error {
+        case SSHClientError.allAuthenticationOptionsFailed:
             return "The Mac refused the login. Check the username and password, or add this phone's key to the Mac in Settings."
+        case is TimedOut:
+            return "\(name) stopped answering. The Mac can be asleep, or the network changed."
+        case is ConnectionLost:
+            return "The connection to \(name) was lost. The Mac can be asleep, or the network changed."
+        default:
+            break
         }
-        if let error = error as? ChannelError, case .connectTimeout = error {
-            return "\(host.hostname) did not answer. The Mac can be asleep, offline, or off Tailscale."
+        // NIO wraps each address it tried. A DNS failure with no attempts means the name is unknown.
+        if let error = error as? NIOConnectionError {
+            if let first = error.connectionErrors.first {
+                return message(for: first.error, host: host)
+            }
+            if error.dnsAError != nil || error.dnsAAAAError != nil {
+                return "\(name) was not found. Check the hostname, and check that Tailscale is running on this phone."
+            }
+        }
+        if let error = error as? ChannelError {
+            switch error {
+            case .connectTimeout:
+                return "\(name) did not answer. The Mac can be asleep, offline, or off Tailscale."
+            case .ioOnClosedChannel, .alreadyClosed, .eof, .outputClosed, .inputClosed:
+                return "The connection to \(name) closed."
+            default:
+                break
+            }
+        }
+        if let error = error as? IOError {
+            switch error.errnoCode {
+            case ECONNREFUSED:
+                return "\(name) refused the connection. Turn on Remote Login in System Settings > General > Sharing."
+            case ETIMEDOUT, EHOSTUNREACH, EHOSTDOWN:
+                return "\(name) did not answer. The Mac can be asleep, offline, or off Tailscale."
+            case ENETUNREACH, ENETDOWN:
+                return "This phone has no route to \(name). Check that Tailscale is running on this phone."
+            case ECONNRESET, EPIPE:
+                return "The connection to \(name) was lost. The Mac can be asleep, or the network changed."
+            default:
+                break
+            }
         }
         let text = String(describing: error)
         if text.contains("connectionRefused") || text.contains("Connection refused") {
-            return "\(host.hostname) refused the connection. Turn on Remote Login in System Settings > General > Sharing."
+            return "\(name) refused the connection. Turn on Remote Login in System Settings > General > Sharing."
         }
         if text.contains("NXDOMAIN") || text.contains("nodename nor servname") || text.contains("unknownHost") {
-            return "\(host.hostname) was not found. Check the hostname and that Tailscale is on."
+            return "\(name) was not found. Check the hostname, and check that Tailscale is running on this phone."
         }
         return "Connection failed: \(text)"
     }

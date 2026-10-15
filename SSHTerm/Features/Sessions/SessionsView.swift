@@ -55,9 +55,7 @@ struct SessionsView: View {
                 }
             }
             .fullScreenCover(item: $launch, onDismiss: { Task { await refresh() } }) { launch in
-                if let client = link.client {
-                    TerminalScreen(host: link.host, client: client, command: launch.command, title: launch.title)
-                }
+                TerminalScreen(link: link, command: launch.command, title: launch.title)
             }
             .confirmationDialog(
                 "Kill \(pendingKill?.name ?? "")?",

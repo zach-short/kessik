@@ -32,13 +32,20 @@ final class MacLink {
         var errorDescription: String? { "Not connected to the Mac." }
     }
 
+    struct NeedsLogin: LocalizedError {
+        var errorDescription: String? { "Log in again in the Sessions tab, then reopen this session." }
+    }
+
     private(set) var state: State = .needsPassword
     /// Changed from the connect card until the settings screen lands (build step 7).
     var host: Host
 
     @ObservationIgnored private(set) var client: SSHClient?
+    @ObservationIgnored private var connecting: Task<SSHClient, Error>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var triedSaved = false
+    @ObservationIgnored private var probing = false
+    @ObservationIgnored private var lastAutoReconnect: Date?
 
     init(host: Host) {
         self.host = host
@@ -48,24 +55,7 @@ final class MacLink {
     /// once the login works, or removes a saved one.
     func connect(password: String?, remember: Bool = true) {
         guard state != .connecting, state != .connected else { return }
-        state = .connecting
-        generation += 1
-        let gen = generation
-        let host = host
-        let typed = password
-        let password = password ?? SavedPassword.get(for: host)
-
-        Task { [weak self] in
-            do {
-                let client = try await SSHClient.connect(to: host, password: password)
-                if let typed {
-                    if remember { SavedPassword.save(typed, for: host) } else { SavedPassword.remove(for: host) }
-                }
-                self?.didConnect(client, gen: gen)
-            } catch {
-                self?.didFail(error, gen: gen)
-            }
-        }
+        Task { _ = try? await establish(password: password, remember: remember) }
     }
 
     /// Connects with saved credentials once per launch, so Disconnect stays disconnected.
@@ -75,46 +65,105 @@ final class MacLink {
         connect(password: nil)
     }
 
+    /// The open client, logging in with the key or saved password when there is none.
+    /// `verify` checks first that the Mac still answers, so a reattach after sleep does not hang.
+    func ensureConnected(verify: Bool = false) async throws -> SSHClient {
+        if let connecting { return try await connecting.value }
+        if let client, state == .connected {
+            if !verify { return client }
+            let gen = generation
+            if await client.isAlive() { return client }
+            if gen == generation { drop(gen: gen, reconnect: false) }
+            if let connecting { return try await connecting.value }
+        }
+        guard Credentials.available(for: host) else { throw NeedsLogin() }
+        return try await establish(password: nil, remember: true)
+    }
+
     /// Runs one command and returns its stdout. A non-zero exit throws.
     func run(_ command: String) async throws -> String {
         guard let client else { throw NotConnected() }
+        let gen = generation
         do {
-            let output = try await client.executeCommand(command)
+            let output = try await withTimeout(20) { try await client.executeCommand(command) }
             return String(buffer: output)
         } catch {
-            if !client.isConnected { dropped(gen: generation) }
+            if error is TimedOut || !client.isConnected { drop(gen: gen) }
             throw error
+        }
+    }
+
+    /// Checks that the Mac still answers. Called when the app comes back, when the network
+    /// changes, and on a timer, because a dead socket after sleep reports no error.
+    func checkAlive() {
+        guard state == .connected, !probing, let client else { return }
+        probing = true
+        let gen = generation
+        Task { [weak self] in
+            let alive = await client.isAlive()
+            guard let self else { return }
+            probing = false
+            if !alive { drop(gen: gen) }
         }
     }
 
     func disconnect() {
         generation += 1
+        connecting?.cancel()
+        connecting = nil
         let client = client
         self.client = nil
         state = .needsPassword
         Task { try? await client?.close() }
     }
 
-    private func didConnect(_ client: SSHClient, gen: Int) {
-        guard gen == generation else {
-            Task { try? await client.close() }
-            return
-        }
-        self.client = client
-        state = .connected
-        client.onDisconnect { [weak self] in
-            Task { @MainActor in self?.dropped(gen: gen) }
+    private func establish(password: String?, remember: Bool) async throws -> SSHClient {
+        state = .connecting
+        generation += 1
+        let gen = generation
+        let host = host
+        let typed = password
+        let password = password ?? SavedPassword.get(for: host)
+        let task = Task { try await SSHClient.connect(to: host, password: password) }
+        connecting = task
+
+        do {
+            let client = try await task.value
+            if let typed {
+                if remember { SavedPassword.save(typed, for: host) } else { SavedPassword.remove(for: host) }
+            }
+            guard gen == generation else {
+                Task { try? await client.close() }
+                throw CancellationError()
+            }
+            connecting = nil
+            self.client = client
+            state = .connected
+            client.onDisconnect { [weak self] in
+                Task { @MainActor in self?.drop(gen: gen) }
+            }
+            return client
+        } catch {
+            if gen == generation {
+                connecting = nil
+                state = .failed(SSHSession.message(for: error, host: host))
+            }
+            throw error
         }
     }
 
-    private func didFail(_ error: Error, gen: Int) {
-        guard gen == generation else { return }
-        state = .failed(SSHSession.message(for: error, host: host))
-    }
-
-    private func dropped(gen: Int) {
+    /// Closes a dead connection, which also ends the terminals that share it. With a key or saved
+    /// password it logs in again once, so the session list comes back without a tap.
+    private func drop(gen: Int, reconnect: Bool = true) {
         guard gen == generation, state == .connected else { return }
-        client = nil
-        state = .failed("The connection to \(host.hostname) dropped.")
+        let client = client
+        self.client = nil
+        state = .failed(SSHSession.message(for: ConnectionLost(), host: host))
+        Task { try? await client?.close() }
+
+        let recent = lastAutoReconnect.map { Date.now.timeIntervalSince($0) < 15 } ?? false
+        guard reconnect, !recent, Credentials.available(for: host) else { return }
+        lastAutoReconnect = .now
+        Task { _ = try? await establish(password: nil, remember: true) }
     }
 }

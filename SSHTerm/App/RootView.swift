@@ -23,6 +23,8 @@ enum AppTab: String, CaseIterable, Identifiable {
 }
 
 struct RootView: View {
+    @Environment(MacLink.self) private var link
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = .hosts
 
     var body: some View {
@@ -38,6 +40,19 @@ struct RootView: View {
         .safeAreaInset(edge: .bottom) {
             PillTabBar(selection: $tab)
                 .padding(.bottom, 4)
+        }
+        // A socket can die in silence during sleep or a network switch. Check the Sessions link
+        // then, and on a timer, so a dead Mac shows a message instead of a hang.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { link.checkAlive() }
+        }
+        .onChange(of: NetworkMonitor.shared.changes) { link.checkAlive() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                // Read live: a captured `scenePhase` keeps the value from when the task started.
+                if UIApplication.shared.applicationState == .active { link.checkAlive() }
+            }
         }
     }
 }
