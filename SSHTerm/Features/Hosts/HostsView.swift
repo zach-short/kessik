@@ -44,11 +44,6 @@ struct HostsView: View {
             .fullScreenCover(item: $activeHost) { host in
                 TerminalScreen(host: host)
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add host", systemImage: "plus") {}
-                }
-            }
         }
     }
 }
