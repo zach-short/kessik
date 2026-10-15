@@ -31,15 +31,36 @@ final class SSHSession {
     @ObservationIgnored private var outbound: AsyncStream<Outbound>.Continuation?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var client: SSHClient?
+    /// Set when the terminal borrows the Sessions tab's connection. It is not closed here.
+    @ObservationIgnored private let sharedClient: SSHClient?
+    /// Typed into the shell once it opens.
+    @ObservationIgnored private let startCommand: String?
     @ObservationIgnored private var size = (cols: 80, rows: 24)
     /// Bumped on each connect so a late callback from an old connection is ignored.
     @ObservationIgnored private var generation = 0
 
-    init(host: Host) {
+    init(host: Host, sharedClient: SSHClient? = nil, startCommand: String? = nil) {
         self.host = host
+        self.sharedClient = sharedClient
+        self.startCommand = startCommand
+        if sharedClient != nil { state = .connecting }
     }
 
+    var ownsClient: Bool { sharedClient == nil }
+
     func connect(password: String) {
+        let host = host
+        open { try await SSHClient.connect(to: host, password: password) }
+    }
+
+    /// Opens the shell on the shared connection.
+    func start() {
+        guard let sharedClient else { return }
+        state = .needsPassword
+        open { sharedClient }
+    }
+
+    private func open(_ makeClient: @escaping @MainActor () async throws -> SSHClient) {
         guard state != .connecting, state != .connected else { return }
         state = .connecting
         generation += 1
@@ -47,19 +68,15 @@ final class SSHSession {
 
         let (stream, continuation) = AsyncStream<Outbound>.makeStream()
         outbound = continuation
-        let host = host
+        if let startCommand {
+            continuation.yield(.data(Array((startCommand + "\n").utf8)))
+        }
         let size = size
+        let ownsClient = ownsClient
 
         task = Task { [weak self] in
             do {
-                let client = try await SSHClient.connect(
-                    host: host.hostname,
-                    port: host.port,
-                    authenticationMethod: .passwordBased(username: host.username, password: password),
-                    hostKeyValidator: .custom(TOFUHostKeyValidator(host: host.hostname, port: host.port)),
-                    reconnect: .never,
-                    connectTimeout: .seconds(10)
-                )
+                let client = try await makeClient()
                 self?.didConnect(client, gen: gen)
 
                 let request = SSHChannelRequestEvent.PseudoTerminalRequest(
@@ -98,7 +115,7 @@ final class SSHSession {
                         group.cancelAll()
                     }
                 }
-                try? await client.close()
+                if ownsClient { try? await client.close() }
                 self?.didEnd(error: nil, gen: gen)
             } catch is CancellationError {
                 self?.didEnd(error: nil, gen: gen)
@@ -125,6 +142,7 @@ final class SSHSession {
     func disconnect() {
         outbound?.finish()
         task?.cancel()
+        guard ownsClient else { return }
         let client = client
         Task { try? await client?.close() }
     }
@@ -138,7 +156,7 @@ final class SSHSession {
 
     private func didConnect(_ client: SSHClient, gen: Int) {
         guard gen == generation else {
-            Task { try? await client.close() }
+            if ownsClient { Task { try? await client.close() } }
             return
         }
         self.client = client

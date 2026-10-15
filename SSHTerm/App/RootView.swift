@@ -45,5 +45,6 @@ struct RootView: View {
 #Preview {
     RootView()
         .environment(AppStore.preview)
+        .environment(MacLink(host: AppStore.preview.hosts[0]))
         .preferredColorScheme(.dark)
 }

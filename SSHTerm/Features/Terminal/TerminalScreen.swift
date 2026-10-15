@@ -1,4 +1,5 @@
 import SwiftUI
+import Citadel
 
 /// Full-screen terminal for one host: password prompt, live shell, and clear error states.
 struct TerminalScreen: View {
@@ -7,9 +8,17 @@ struct TerminalScreen: View {
     @State private var session: SSHSession
     @State private var password = ""
     @FocusState private var passwordFocused: Bool
+    private let title: String?
 
     init(host: Host) {
         _session = State(initialValue: SSHSession(host: host))
+        title = nil
+    }
+
+    /// Opens a shell on an existing connection and types `command` into it. Closes when the shell ends.
+    init(host: Host, client: SSHClient, command: String, title: String) {
+        _session = State(initialValue: SSHSession(host: host, sharedClient: client, startCommand: command))
+        self.title = title
     }
 
     var body: some View {
@@ -23,7 +32,12 @@ struct TerminalScreen: View {
             }
         }
         .background(Theme.background.ignoresSafeArea())
+        .onAppear { if !session.ownsClient { session.start() } }
         .onDisappear { session.disconnect() }
+        .onChange(of: session.state) { _, state in
+            // tmux detached or exited: go back to the session list.
+            if state == .disconnected, !session.ownsClient { dismiss() }
+        }
     }
 
     // MARK: Status line
@@ -47,6 +61,12 @@ struct TerminalScreen: View {
                 .font(Theme.mono)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
+            if let title {
+                Text(title)
+                    .font(Theme.mono)
+                    .foregroundStyle(Theme.accent)
+                    .lineLimit(1)
+            }
             Spacer()
             Text(stateLabel)
                 .font(.caption)
@@ -137,8 +157,13 @@ struct TerminalScreen: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Try again") { session.reset() }
-                .buttonStyle(.borderedProminent)
+            if session.ownsClient {
+                Button("Try again") { session.reset() }
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button("Close") { dismiss() }
+                    .buttonStyle(.borderedProminent)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)

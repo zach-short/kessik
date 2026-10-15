@@ -3,6 +3,7 @@ import SwiftUI
 enum SettingsKey {
     static let terminalFontSize = "terminalFontSize"
     static let hapticsEnabled = "hapticsEnabled"
+    static let sessionsAddress = "sessionsAddress"
 }
 
 struct SettingsView: View {

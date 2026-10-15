@@ -53,9 +53,9 @@ final class AppStore {
         self.sessions = sessions
     }
 
-    /// Placeholder data until SSH lands (build step 2).
+    /// Placeholder hosts until the settings screen (build step 7). Sessions come from the Mac.
     convenience init() {
-        self.init(hosts: AppStore.preview.hosts, sessions: AppStore.preview.sessions)
+        self.init(hosts: AppStore.preview.hosts, sessions: [])
     }
 
     static let preview = AppStore(
