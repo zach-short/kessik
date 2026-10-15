@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig and fill in. Local.xcconfig is git-ignored.
+// Find the team ID in Xcode > Settings > Accounts, or developer.apple.com > Membership.
+DEVELOPMENT_TEAM = YOURTEAMID
+SSHTERM_BUNDLE_ID = com.yourname.sshterm

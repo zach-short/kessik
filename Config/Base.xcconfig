@@ -1,0 +1,5 @@
+// Shared build settings. Safe to commit.
+// Personal values (team ID, bundle ID) go in Local.xcconfig, which git ignores.
+SSHTERM_BUNDLE_ID = com.example.sshterm
+
+#include? "Local.xcconfig"
