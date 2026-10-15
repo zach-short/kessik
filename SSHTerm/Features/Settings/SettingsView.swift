@@ -33,8 +33,12 @@ struct SettingsView: View {
                         .foregroundStyle(Theme.textPrimary)
                 }
 
-                Section("Feedback") {
+                Section {
                     Toggle("Haptics on key taps", isOn: $hapticsEnabled)
+                } header: {
+                    Text("Feedback")
+                } footer: {
+                    Text("For the key bar and reply chips. Letter keys follow iOS Settings > Sounds & Haptics > Keyboard Feedback.")
                 }
 
                 Section {

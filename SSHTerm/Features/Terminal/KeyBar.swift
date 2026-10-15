@@ -7,8 +7,15 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
     private let stack = UIStackView()
     private var ctrlButton: UIButton!
     private var repeatTimer: Timer?
+    private let tapHaptic = UIImpactFeedbackGenerator(style: .light)
+    private let copyHaptic = UINotificationFeedbackGenerator()
 
     var enableInputClicksWhenVisible: Bool { true }
+
+    /// Read on every tap, so the Settings toggle applies to a terminal that is already open.
+    private var hapticsEnabled: Bool {
+        UserDefaults.standard.object(forKey: SettingsKey.hapticsEnabled) as? Bool ?? true
+    }
 
     init(terminal: TerminalView) {
         self.terminal = terminal
@@ -77,15 +84,16 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
             stack.addArrangedSubview(key(symbol) { $0.send(txt: symbol) })
         }
 
-        fixed.addArrangedSubview(key(icon: "doc.on.doc", label: "Copy") { [weak self] t in self?.copy(from: t) })
+        fixed.addArrangedSubview(key(icon: "doc.on.doc", label: "Copy", tapFeedback: false) { [weak self] t in self?.copy(from: t) })
         fixed.addArrangedSubview(key(icon: "doc.on.clipboard", label: "Paste") { $0.paste(nil) })
         fixed.addArrangedSubview(key(icon: "keyboard.chevron.compact.down", label: "Hide keyboard") { _ = $0.resignFirstResponder() })
     }
 
     // MARK: Buttons
 
+    /// `tapFeedback: false` is for a key whose action plays its own haptic.
     private func key(_ title: String? = nil, icon: String? = nil, label: String? = nil,
-                     action: ((TerminalView) -> Void)? = nil) -> UIButton {
+                     tapFeedback: Bool = true, action: ((TerminalView) -> Void)? = nil) -> UIButton {
         var config = UIButton.Configuration.filled()
         config.cornerStyle = .medium
         config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10)
@@ -110,13 +118,24 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         button.widthAnchor.constraint(greaterThanOrEqualToConstant: 38).isActive = true
         button.accessibilityLabel = label ?? title
         if let action {
+            // Wake the Taptic Engine on touch down, so the haptic on touch up has no lag.
             button.addAction(UIAction { [weak self] _ in
-                guard let terminal = self?.terminal else { return }
-                UIDevice.current.playInputClick()
+                guard let self, self.hapticsEnabled else { return }
+                if tapFeedback { self.tapHaptic.prepare() } else { self.copyHaptic.prepare() }
+            }, for: .touchDown)
+            button.addAction(UIAction { [weak self] _ in
+                guard let self, let terminal = self.terminal else { return }
+                if tapFeedback { self.keyFeedback() }
                 action(terminal)
             }, for: .touchUpInside)
         }
         return button
+    }
+
+    /// The input click (it follows the system Keyboard Clicks setting) and the haptic (it follows ours).
+    private func keyFeedback() {
+        UIDevice.current.playInputClick()
+        if hapticsEnabled { tapHaptic.impactOccurred() }
     }
 
     /// Arrow keys repeat while held, and follow the shell's cursor-key mode.
@@ -127,7 +146,7 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
             terminal.send(terminal.getTerminal().applicationCursor ? app : normal)
         }
         button.addAction(UIAction { [weak self] _ in
-            UIDevice.current.playInputClick()
+            self?.keyFeedback()
             fire()
             self?.repeatTimer?.invalidate()
             self?.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { _ in
@@ -155,7 +174,8 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
                 end: Position(col: t.cols - 1, row: top + t.rows - 1)
             )
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        UIDevice.current.playInputClick()
+        if hapticsEnabled { copyHaptic.notificationOccurred(.success) }
     }
 
     @objc private func ctrlReset() {
