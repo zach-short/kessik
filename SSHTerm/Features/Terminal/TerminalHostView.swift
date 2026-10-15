@@ -18,6 +18,7 @@ struct TerminalHostView: UIViewRepresentable {
         view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
         view.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         view.optionAsMetaKey = true
+        view.inputAccessoryView = KeyBar(terminal: view)
 
         session.onOutput = { [weak view] bytes in
             view?.feed(byteArray: bytes)
