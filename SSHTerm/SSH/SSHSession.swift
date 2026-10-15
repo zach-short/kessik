@@ -48,9 +48,19 @@ final class SSHSession {
 
     var ownsClient: Bool { sharedClient == nil }
 
-    func connect(password: String) {
+    /// `password` nil means the key and the saved password only. `remember` saves a typed password
+    /// once the login works, or removes a saved one.
+    func connect(password: String?, remember: Bool = true) {
         let host = host
-        open { try await SSHClient.connect(to: host, password: password) }
+        let typed = password
+        let password = password ?? SavedPassword.get(for: host)
+        open {
+            let client = try await SSHClient.connect(to: host, password: password)
+            if let typed {
+                if remember { SavedPassword.save(typed, for: host) } else { SavedPassword.remove(for: host) }
+            }
+            return client
+        }
     }
 
     /// Opens the shell on the shared connection.
@@ -186,7 +196,7 @@ final class SSHSession {
             return text
         }
         if case SSHClientError.allAuthenticationOptionsFailed = error {
-            return "The Mac refused the username or password."
+            return "The Mac refused the login. Check the username and password, or add this phone's key to the Mac in Settings."
         }
         if let error = error as? ChannelError, case .connectTimeout = error {
             return "\(host.hostname) did not answer. The Mac can be asleep, offline, or off Tailscale."

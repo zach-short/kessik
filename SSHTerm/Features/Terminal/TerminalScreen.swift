@@ -5,6 +5,7 @@ import Citadel
 struct TerminalScreen: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(SettingsKey.terminalFontSize) private var fontSize = 13.0
+    @AppStorage(SettingsKey.rememberPasswords) private var remember = true
     @State private var session: SSHSession
     @State private var password = ""
     @FocusState private var passwordFocused: Bool
@@ -32,7 +33,13 @@ struct TerminalScreen: View {
             }
         }
         .background(Theme.background.ignoresSafeArea())
-        .onAppear { if !session.ownsClient { session.start() } }
+        .onAppear {
+            if !session.ownsClient {
+                session.start()
+            } else if Credentials.available(for: session.host) {
+                session.connect(password: nil)
+            }
+        }
         .onDisappear { session.disconnect() }
         .onChange(of: session.state) { _, state in
             // tmux detached or exited: go back to the session list.
@@ -138,9 +145,7 @@ struct TerminalScreen: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(password.isEmpty)
-            Text("The password is not saved.")
-                .font(.caption)
-                .foregroundStyle(Theme.textTertiary)
+            PasswordSaveToggle(remember: $remember)
         }
         .padding(20)
         .card()
@@ -173,7 +178,25 @@ struct TerminalScreen: View {
 
     private func connect() {
         guard !password.isEmpty else { return }
-        session.connect(password: password)
+        session.connect(password: password, remember: remember)
         password = ""
+    }
+}
+
+/// "Save in Keychain" switch under a password field. The phone's key, when there is one, is tried first.
+struct PasswordSaveToggle: View {
+    @Binding var remember: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Save password in Keychain", isOn: $remember)
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+            if DeviceKey.load() != nil {
+                Text("This phone's SSH key is tried first.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+        }
     }
 }

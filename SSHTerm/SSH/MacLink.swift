@@ -3,12 +3,12 @@ import Observation
 import Citadel
 
 extension SSHClient {
-    /// Password login with the app's host key check and timeout.
-    static func connect(to host: Host, password: String) async throws -> SSHClient {
+    /// Key, then password login, with the app's host key check and timeout.
+    static func connect(to host: Host, password: String?) async throws -> SSHClient {
         try await SSHClient.connect(
             host: host.hostname,
             port: host.port,
-            authenticationMethod: .passwordBased(username: host.username, password: password),
+            authenticationMethod: .custom(LoginMethods(username: host.username, key: DeviceKey.load(), password: password)),
             hostKeyValidator: .custom(TOFUHostKeyValidator(host: host.hostname, port: host.port)),
             reconnect: .never,
             connectTimeout: .seconds(10)
@@ -38,26 +38,41 @@ final class MacLink {
 
     @ObservationIgnored private(set) var client: SSHClient?
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var triedSaved = false
 
     init(host: Host) {
         self.host = host
     }
 
-    func connect(password: String) {
+    /// `password` nil means the key and the saved password only. `remember` saves a typed password
+    /// once the login works, or removes a saved one.
+    func connect(password: String?, remember: Bool = true) {
         guard state != .connecting, state != .connected else { return }
         state = .connecting
         generation += 1
         let gen = generation
         let host = host
+        let typed = password
+        let password = password ?? SavedPassword.get(for: host)
 
         Task { [weak self] in
             do {
                 let client = try await SSHClient.connect(to: host, password: password)
+                if let typed {
+                    if remember { SavedPassword.save(typed, for: host) } else { SavedPassword.remove(for: host) }
+                }
                 self?.didConnect(client, gen: gen)
             } catch {
                 self?.didFail(error, gen: gen)
             }
         }
+    }
+
+    /// Connects with saved credentials once per launch, so Disconnect stays disconnected.
+    func connectSavedOnce() {
+        guard !triedSaved, state == .needsPassword, Credentials.available(for: host) else { return }
+        triedSaved = true
+        connect(password: nil)
     }
 
     /// Runs one command and returns its stdout. A non-zero exit throws.

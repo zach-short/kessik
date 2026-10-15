@@ -144,6 +144,7 @@ struct SessionsView: View {
 struct ConnectCard: View {
     var link: MacLink
     @AppStorage(SettingsKey.sessionsAddress) private var address = ""
+    @AppStorage(SettingsKey.rememberPasswords) private var remember = true
     @State private var password = ""
 
     var body: some View {
@@ -188,22 +189,33 @@ struct ConnectCard: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(password.isEmpty || parsedHost == nil || link.state == .connecting)
-            Text("The password is not saved.")
-                .font(.caption)
-                .foregroundStyle(Theme.textTertiary)
+            .disabled(!canConnect)
+            PasswordSaveToggle(remember: $remember)
         }
         .padding(16)
         .card()
-        .onAppear { if address.isEmpty { address = link.host.address } }
+        .onAppear {
+            if address.isEmpty {
+                address = link.host.address
+            } else if let host = parsedHost {
+                link.host = host
+                link.connectSavedOnce()
+            }
+        }
     }
 
     private var parsedHost: Host? { Host(quickConnect: address) }
 
+    /// An empty password still connects when the key or a saved password can log in.
+    private var canConnect: Bool {
+        guard let host = parsedHost, link.state != .connecting else { return false }
+        return !password.isEmpty || Credentials.available(for: host)
+    }
+
     private func connect() {
-        guard !password.isEmpty, let host = parsedHost else { return }
+        guard canConnect, let host = parsedHost else { return }
         link.host = host
-        link.connect(password: password)
+        link.connect(password: password.isEmpty ? nil : password, remember: remember)
         password = ""
     }
 }
