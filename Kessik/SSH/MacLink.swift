@@ -5,16 +5,10 @@ import Citadel
 extension SSHClient {
     /// Key, then password login, with the app's host key check and timeout. `typed` nil means the
     /// saved password. The gate reads both from the Keychain, after Face ID when Settings asks for it.
+    /// A Mac with a jump host is reached through it, and each hop checks its own host key.
     static func connect(to host: Host, typed: String?, gate: LoginGate = .live) async throws -> SSHClient {
         let secrets = try await gate.secrets(for: host, typed: typed)
-        return try await SSHClient.connect(
-            host: host.hostname,
-            port: host.port,
-            authenticationMethod: .custom(LoginMethods(username: host.username, key: secrets.key, password: secrets.password)),
-            hostKeyValidator: .custom(TOFUHostKeyValidator(host: host.hostname, port: host.port)),
-            reconnect: .never,
-            connectTimeout: .seconds(10)
-        )
+        return try await LoginRoute.connect(to: host, secrets: secrets)
     }
 }
 
@@ -116,7 +110,7 @@ final class MacLink {
     /// Switches to the Mac saved in Settings. A different login closes the open connection,
     /// and the terminals that share it, because they belong to the old Mac.
     func use(_ newHost: Host) {
-        let changed = !newHost.sameLogin(as: host)
+        let changed = !newHost.sameLogin(as: host) || newHost.jump != host.jump
         host = newHost
         guard changed else { return }
         disconnect()
@@ -156,11 +150,12 @@ final class MacLink {
             connecting = nil
             self.client = client
             state = .connected
-            client.onDisconnect { [weak self] in
+            client.whenDisconnected { [weak self] in
                 Task { @MainActor in self?.drop(gen: gen) }
             }
-            // Again on each login until found, so Tailscale installed later shows up.
-            if host.isLocalName, tailscaleAddress == nil {
+            // Again on each login until found, so Tailscale installed later shows up. Through a jump
+            // host, the jump host resolves the name, so it is not tied to this Wi-Fi.
+            if host.isLocalName, host.jump == nil, tailscaleAddress == nil {
                 Task { await lookUpTailscale(gen: gen) }
             }
             return client

@@ -23,6 +23,7 @@ struct TerminalScreen: View {
     @FocusState private var passwordFocused: Bool
     @AppStorage(SettingsKey.previewPort) private var previewPort = 3000
     @State private var composing = false
+    @State private var searching = false
     @State private var pickingImage = false
     @State private var pickedImage: PhotosPickerItem?
     @State private var askingPort = false
@@ -109,6 +110,11 @@ struct TerminalScreen: View {
         }
         .sheet(isPresented: $composing, onDismiss: refocusTerminal) {
             ComposeSheet { text, send in paste(text, send: send) }
+        }
+        .sheet(isPresented: $searching, onDismiss: refocusTerminal) {
+            if let client = session.sshClient, let tmuxName {
+                ScrollbackSearchSheet(client: client, session: tmuxName)
+            }
         }
         .photosPicker(isPresented: $pickingImage, selection: $pickedImage, matching: .images)
         .onChange(of: pickedImage) { _, item in
@@ -200,6 +206,10 @@ struct TerminalScreen: View {
     private var toolsMenu: some View {
         Menu {
             Button("Write a prompt", systemImage: "square.and.pencil") { composing = true }
+            // tmux holds the history, so search needs a tmux session.
+            if tmuxName != nil {
+                Button("Search the scrollback", systemImage: "magnifyingglass") { searching = true }
+            }
             Button("Send an image", systemImage: "photo") { pickingImage = true }
             Button("Preview a port", systemImage: "safari") {
                 portText = String(previewPort)
@@ -461,7 +471,7 @@ struct PasswordSaveToggle: View {
             Toggle("Save password in Keychain", isOn: $remember)
                 .font(.subheadline)
                 .foregroundStyle(Theme.textSecondary)
-            if DeviceKey.load() != nil {
+            if PhoneKey.exists {
                 Text("This phone's SSH key is tried first.")
                     .font(.caption)
                     .foregroundStyle(Theme.textTertiary)

@@ -124,17 +124,25 @@ struct SettingsView: View {
     }
 }
 
-/// The phone's ed25519 key: make one, copy or install the public half, replace or delete it.
+/// The phone's ed25519 or Secure Enclave key: pick the kind, make or import one, copy or install the
+/// public half, replace or delete it. Only an ed25519 key can be imported.
 private struct KeySection: View {
     @Environment(MacLink.self) private var link
-    @State private var publicLine = DeviceKey.load().map(DeviceKey.publicLine(for:))
+    @State private var kind = LoginKeyKind.current
+    @State private var publicLine = PhoneKey.publicLine()
     @State private var status: String?
     @State private var installing = false
     @State private var confirmReplace = false
     @State private var confirmDelete = false
+    @State private var importing = false
 
     var body: some View {
         Section {
+            KeyKindPicker(kind: $kind)
+                .onChange(of: kind) {
+                    publicLine = PhoneKey.publicLine(kind)
+                    status = nil
+                }
             if let publicLine {
                 Text(publicLine)
                     .font(Theme.mono)
@@ -142,6 +150,12 @@ private struct KeySection: View {
                     .textSelection(.enabled)
                     .lineLimit(3)
                     .truncationMode(.middle)
+                if let fingerprint = KeyImport.fingerprint(ofLine: publicLine) {
+                    Text(fingerprint)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(Theme.textSecondary)
+                        .textSelection(.enabled)
+                }
                 Button("Copy public key", systemImage: "doc.on.doc") {
                     UIPasteboard.general.string = publicLine
                     status = "Copied. Add it to ~/.ssh/authorized_keys on the Mac."
@@ -157,9 +171,15 @@ private struct KeySection: View {
                 }
                 .disabled(link.state != .connected || installing)
                 Button("New key", systemImage: "arrow.triangle.2.circlepath") { confirmReplace = true }
+                if kind == .ed25519 {
+                    Button("Import key", systemImage: "square.and.arrow.down") { importing = true }
+                }
                 Button("Delete key", systemImage: "trash", role: .destructive) { confirmDelete = true }
             } else {
                 Button("Generate SSH key", systemImage: "key") { generate() }
+                if kind == .ed25519 {
+                    Button("Import key", systemImage: "square.and.arrow.down") { importing = true }
+                }
             }
         } header: {
             Text("SSH key")
@@ -173,28 +193,35 @@ private struct KeySection: View {
         }
         .confirmationDialog("Delete the SSH key?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete key", role: .destructive) {
-                DeviceKey.delete()
+                PhoneKey.delete(kind)
                 publicLine = nil
                 status = nil
             }
         } message: {
             Text("The app then logs in with a password only. The old line stays in authorized_keys on the Mac until you remove it.")
         }
+        .sheet(isPresented: $importing) {
+            KeyImportSheet { line in
+                publicLine = line
+                status = "Imported. If the Mac does not have this key yet, tap Add to."
+            }
+        }
     }
 
     private var footer: String {
         if publicLine == nil {
+            if kind == .secureEnclave { return EnclaveKey.aboutText }
             return "An ed25519 key lets the app log in to the Mac without a password. The private key stays in this phone's Keychain."
         }
         if link.state != .connected {
             return "Connect in the Sessions tab to add the key to the Mac from here."
         }
-        return "The app tries this key before the password."
+        return kind == .secureEnclave ? "The app asks for Face ID, then tries this key before the password." : "The app tries this key before the password."
     }
 
     private func generate() {
         do {
-            publicLine = DeviceKey.publicLine(for: try DeviceKey.generate())
+            publicLine = try PhoneKey.generate(kind)
             status = nil
         } catch {
             status = error.localizedDescription

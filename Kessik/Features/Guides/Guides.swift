@@ -66,6 +66,10 @@ extension Guide {
                 fix: "Turn on Remote Login on the Mac, and join the same Wi-Fi. Check that Local Network is on for Kessik in iOS Settings > Privacy & Security > Local Network."),
             Fix(problem: "\"The Mac refused the login\"",
                 fix: "Check the username, and use the password you type to log in to the Mac."),
+            Fix(problem: "An error that starts with \"Jump host:\"",
+                fix: "The app did not get past the jump host. Check its hostname, port and username under Jump host in the Mac's settings. Save its password there, or add this phone's key to `~/.ssh/authorized_keys` on the jump host."),
+            Fix(problem: "An error that starts with \"Mac, through\"",
+                fix: "The jump host worked, and the Mac failed. Use the Mac's name or address as the jump host sees it. The jump host must allow TCP forwarding (`AllowTcpForwarding yes`)."),
         ]
     )
 
@@ -76,7 +80,7 @@ extension Guide {
         summary: "Add this phone's SSH key to the Mac. Then Connect works with an empty password.",
         steps: [
             Step(title: "Make a key",
-                 text: "In Settings > SSH key, tap Generate SSH key. The private key stays in this phone's Keychain.",
+                 text: "In Settings > SSH key, pick a Key type and tap Generate SSH key. To use an ed25519 key you already have, pick Ed25519 and tap *Import key*, then paste or choose its private key file. An ed25519 key stays in this phone's Keychain. A Secure Enclave key never leaves this iPhone and asks for Face ID at each login. The Mac accepts both kinds with no change to its settings.",
                  opens: .settings),
             Step(title: "Connect with the password",
                  text: "Connect once in the Sessions tab with the Mac's password.",
@@ -92,6 +96,14 @@ extension Guide {
                 fix: "Copy or share the public key in Settings. On the Mac, add it as a new line in `~/.ssh/authorized_keys`."),
             Fix(problem: "The key stopped working",
                 fix: "*New key* replaces the old key. Add the new key to the Mac again."),
+            Fix(problem: "Import says the key type is not supported",
+                fix: "The app imports ed25519 keys in OpenSSH format only. Make one on the Mac with `ssh-keygen -t ed25519`, or tap Generate SSH key."),
+            Fix(problem: "Import says the encryption cannot be read",
+                fix: "The app reads keys with a passphrase when they use aes256-ctr, the ssh-keygen default. For other keys, run `ssh-keygen -p -f <file>` on a copy of the key on the Mac, set an empty passphrase, and import the copy."),
+            Fix(problem: "The Secure Enclave key stopped working after a Face ID change",
+                fix: "A reset of Face ID, or a new appearance, locks the old Secure Enclave key for good. Connect with the password, then tap *New key* and *Add to* again."),
+            Fix(problem: "Face ID was canceled at login",
+                fix: "The app then skips the key and tries the saved password. Tap Connect again to use the key."),
         ]
     )
 
@@ -150,6 +162,13 @@ extension Guide {
             Step(title: "Reconnect",
                  text: "If the network drops, the last screen stays. Tap Reconnect to attach to the same tmux session again.",
                  symbol: "arrow.clockwise"),
+            Step(title: "Search the history",
+                 text: "In the tools menu at the top right, Search the scrollback reads the last 10,000 lines of the tmux session. Type text to show only the lines that hold it. Tap a line to copy it.",
+                 symbol: "magnifyingglass"),
+        ],
+        fixes: [
+            Fix(problem: "\"tmux could not read this session\"",
+                fix: "The tmux session closed or was renamed on the Mac. Close the terminal and open the session again from the Sessions tab."),
         ]
     )
 }

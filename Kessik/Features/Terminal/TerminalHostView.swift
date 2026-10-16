@@ -13,11 +13,19 @@ struct TerminalHostView: UIViewRepresentable {
     let onCompose: () -> Void
     @AppStorage(SettingsKey.monoFont) private var fontFamily = MonoFont.defaultFamily
     @AppStorage(SettingsKey.terminalPalette) private var paletteID = TerminalPalette.defaultID
+    /// Read so the colors update when an imported palette is deleted.
+    @AppStorage(CustomPalettes.key) private var customPalettes = Data()
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppStore.self) private var store
 
-    /// The palette's colors for the app theme in use. Only Default changes with the theme.
+    /// The palette's colors for the app theme in use. Only Default changes with the theme. The
+    /// Mac's own palette wins over the one in Settings. The Mac is read from the store, so an edit
+    /// in Settings reaches a terminal that is open.
     private var paletteColors: TerminalPalette.Colors {
-        TerminalPalette.named(paletteID).colors(dark: colorScheme == .dark)
+        let host = store.hosts.first { $0.id == session.host.id } ?? session.host
+        let available = TerminalPalette.all + CustomPalettes.decode(customPalettes)
+        return TerminalPalette.resolve(host: host, global: paletteID, available: available)
+            .colors(dark: colorScheme == .dark)
     }
 
     func makeCoordinator() -> Coordinator {

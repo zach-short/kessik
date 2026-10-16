@@ -132,6 +132,7 @@ private struct MacFormSheet: View {
 /// Where the app logs in: name, hostname, port and username. Edits apply on Save, so typing
 /// does not drop the connection on each key. A new Mac becomes the active one; an edit keeps
 /// the active Mac as it was.
+/// The Mac's terminal colors are here too, and override the colors in Settings > Appearance.
 private struct MacForm: View {
     var editing: Host?
     var onSaved: () -> Void = {}
@@ -142,6 +143,12 @@ private struct MacForm: View {
     @State private var hostname = ""
     @State private var port = ""
     @State private var username = ""
+    @State private var jump = JumpHostDraft()
+    @State private var jumpPasswordSaved = false
+    /// Nil is "Same as app".
+    @State private var paletteID: String?
+    /// Read so the colors picker lists newly imported palettes.
+    @AppStorage(CustomPalettes.key) private var customPalettes = Data()
     @State private var finding = false
     @State private var foundNote = false
     @State private var loaded = false
@@ -155,6 +162,13 @@ private struct MacForm: View {
             field("Hostname", prompt: "mac.tailnet.ts.net", text: $hostname, keyboard: .URL)
             field("Port", prompt: "22", text: $port, keyboard: .numberPad)
             field("Username", prompt: "whoami on the Mac", text: $username)
+            Picker("Terminal colors", selection: $paletteID) {
+                Text("Same as app").tag(String?.none)
+                ForEach(palettes) { palette in
+                    Text(palette.name).tag(Optional(palette.id))
+                }
+            }
+            JumpHostFields(draft: $jump, hasSavedPassword: jumpPasswordSaved)
             Button("Save") { save() }
                 .disabled(draft == nil || !changed)
         } header: {
@@ -188,6 +202,13 @@ private struct MacForm: View {
         }
     }
 
+    private var palettes: [TerminalPalette] { TerminalPalette.all + CustomPalettes.decode(customPalettes) }
+
+    /// The id when its palette still exists. A deleted imported palette reads as "Same as app".
+    private func existing(_ id: String?) -> String? {
+        id.flatMap { id in palettes.contains { $0.id == id } ? id : nil }
+    }
+
     private var trimmedHostname: String { hostname.trimmingCharacters(in: .whitespaces) }
     private var trimmedUsername: String { username.trimmingCharacters(in: .whitespaces) }
 
@@ -209,26 +230,31 @@ private struct MacForm: View {
     /// The host to save, or nil while a field is empty or not valid.
     private var draft: Host? {
         guard !trimmedHostname.isEmpty, !trimmedUsername.isEmpty, hostnameProblem == nil,
-              !trimmedUsername.contains(where: \.isWhitespace), let portNumber else { return nil }
+              !trimmedUsername.contains(where: \.isWhitespace), let portNumber, jump.problem == nil else { return nil }
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         var host = editing ?? Host(id: newID, name: "", hostname: "", username: "")
         host.name = trimmedName.isEmpty ? "Mac" : trimmedName
         host.hostname = trimmedHostname
         host.port = portNumber
         host.username = trimmedUsername
+        host.jump = jump.jump
+        host.paletteID = existing(paletteID)
         return host
     }
 
     private var changed: Bool {
         guard let draft else { return false }
         guard let editing else { return true }
-        return !draft.sameLogin(as: editing) || draft.name != editing.name
+        return !draft.sameLogin(as: editing) || draft.name != editing.name || draft.jump != editing.jump
+            || !jump.password.isEmpty || draft.paletteID != existing(editing.paletteID)
     }
 
     private var footer: String {
         if let hostnameProblem { return hostnameProblem }
         if portNumber == nil { return "The port is a number from 1 to 65535." }
-        if let draft, activates, link.host.isSet, !draft.sameLogin(as: link.host), link.state == .connected {
+        if let problem = jump.problem { return problem }
+        if let draft, activates, link.host.isSet, !draft.sameLogin(as: link.host) || draft.jump != link.host.jump,
+           link.state == .connected {
             return "Saving disconnects from \(link.host.hostname) and closes its open terminals."
         }
         if foundNote {
@@ -249,11 +275,17 @@ private struct MacForm: View {
         hostname = host.hostname
         port = host.port != 22 ? String(host.port) : ""
         username = host.username
+        jump = JumpHostDraft(host.jump)
+        paletteID = existing(host.paletteID)
+        jumpPasswordSaved = host.jump.map { SavedPassword.get(for: $0.login) != nil } ?? false
     }
 
     private func save() {
         guard let host = draft else { return }
         let activates = activates
+        if let target = host.jump?.login, !jump.password.isEmpty {
+            SavedPassword.save(jump.password, for: target)
+        }
         store.saveMac(host, activate: activates)
         if activates { link.use(host) }
         foundNote = false

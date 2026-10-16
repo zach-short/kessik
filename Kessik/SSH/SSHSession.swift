@@ -250,6 +250,9 @@ final class SSHSession {
         if !NetworkMonitor.shared.isOnline {
             return "This phone is offline. Connect to Wi-Fi or cellular data, then try again."
         }
+        if let hop = error as? HopFailure {
+            return hop.text { message(for: $0, host: $1) }
+        }
         if let error = error as? LocalizedError, let text = error.errorDescription {
             return text
         }

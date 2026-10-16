@@ -3,7 +3,7 @@ import Foundation
 /// Shell commands the app sends to the Mac, and parsers for their output.
 enum Tmux {
     /// Non-login exec shells do not load Homebrew's PATH, so tmux would be missing.
-    private static let pathPrefix = #"export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; "#
+    static let pathPrefix = #"export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; "#
     static let noTmuxMarker = "__SSHTERM_NO_TMUX__"
 
     /// First line is $HOME, then one line per session. tmux escapes tabs in its output, so the

@@ -14,6 +14,12 @@ struct Host: Identifiable, Codable, Hashable {
     var username: String
     var lastConnected: Date?
     var status: Status = .unknown
+    /// Logged in to first, to reach the Mac through it. Nil connects straight to the Mac.
+    /// Optional, so Macs saved before jump hosts still decode.
+    var jump: JumpHost?
+    /// Terminal colors for this Mac, by palette id. Nil uses the palette from Settings. Older
+    /// builds saved no such key, and a missing key decodes as nil.
+    var paletteID: String?
 
     var address: String { port == 22 ? "\(username)@\(hostname)" : "\(username)@\(hostname):\(port)" }
 
@@ -198,9 +204,15 @@ final class AppStore {
 
     /// Adds a Mac or edits one. `activate` makes it the Mac the Sessions tab uses.
     func saveMac(_ host: Host, activate: Bool) {
+        let old = hosts.first { $0.id == host.id }
         changeMacs {
             $0.save(host)
             if activate { $0.setActive(host.id) }
+        }
+        // A jump host this Mac no longer uses keeps no password, unless another Mac still logs in to it.
+        if let oldJump = old?.jump?.login, host.jump.map({ !$0.login.sameLogin(as: oldJump) }) ?? true,
+           !macs.macs.contains(where: { $0.sameLogin(as: oldJump) || $0.jump?.login.sameLogin(as: oldJump) == true }) {
+            SavedPassword.remove(for: oldJump)
         }
     }
 
@@ -211,8 +223,11 @@ final class AppStore {
     /// Also forgets the Mac's saved password, unless another saved Mac logs in to the same target.
     func removeMac(_ host: Host) {
         changeMacs { $0.remove(host.id) }
-        if !macs.sharesLogin(with: host) {
+        if !macs.sharesLogin(with: host), !macs.jumpsThrough(host) {
             SavedPassword.remove(for: host)
+        }
+        if let jump = host.jump, !macs.sharesJumpLogin(with: host) {
+            SavedPassword.remove(for: jump.login)
         }
     }
 

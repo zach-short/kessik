@@ -12,12 +12,16 @@ final class TOFUHostKeyValidator: NIOSSHClientServerAuthenticationDelegate {
         }
     }
 
-    private let storageKey: String
+    /// Where the trusted key is saved. Tests read it to check which host a validator guards.
+    let storageKey: String
     private let hostLabel: String
     private let defaults: UserDefaults
 
-    init(host: String, port: Int, defaults: UserDefaults = .standard) {
-        self.storageKey = Self.storageKey(host: host, port: port)
+    /// `via` is the jump host the connection goes through. A name such as `localhost` or a LAN address
+    /// means a different Mac behind each jump host, so the trusted key is saved per jump host too.
+    init(host: String, port: Int, via jump: Host? = nil, defaults: UserDefaults = .standard) {
+        let own = Self.storageKey(host: host, port: port)
+        self.storageKey = jump.map { "hostKey.\($0.hostname):\($0.port)/" + own.dropFirst("hostKey.".count) } ?? own
         self.hostLabel = host
         self.defaults = defaults
     }

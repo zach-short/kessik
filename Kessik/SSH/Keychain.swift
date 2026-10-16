@@ -25,7 +25,8 @@ struct Keychain {
         return result as? Data
     }
 
-    func set(_ data: Data, for account: String) throws {
+    /// `accessible` applies when the item is new. An update keeps the item's old setting.
+    func set(_ data: Data, for account: String, accessible: CFString = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly) throws {
         let status = SecItemUpdate(base(account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         guard status == errSecItemNotFound else {
             guard status == errSecSuccess else { throw Failure(status: status) }
@@ -33,7 +34,7 @@ struct Keychain {
         }
         var item = base(account)
         item[kSecValueData as String] = data
-        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        item[kSecAttrAccessible as String] = accessible
         let added = SecItemAdd(item as CFDictionary, nil)
         guard added == errSecSuccess else { throw Failure(status: added) }
     }
@@ -112,6 +113,11 @@ enum DeviceKey {
         return key
     }
 
+    /// Saves an imported key in place of the current one.
+    static func save(_ key: Curve25519.Signing.PrivateKey) throws {
+        try keychain.set(key.rawRepresentation, for: account)
+    }
+
     static func delete() {
         keychain.delete(account)
     }
@@ -132,8 +138,11 @@ enum DeviceKey {
 }
 
 enum Credentials {
-    /// True when a connection can start without typing a password.
+    /// True when a connection can start without typing a password. Through a jump host, both hops
+    /// need the key or their own saved password.
     static func available(for host: Host) -> Bool {
-        DeviceKey.load() != nil || SavedPassword.get(for: host) != nil
+        if PhoneKey.exists { return true }
+        guard SavedPassword.get(for: host) != nil else { return false }
+        return host.jump.map { SavedPassword.get(for: $0.login) != nil } ?? true
     }
 }

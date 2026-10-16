@@ -14,12 +14,14 @@ None of the three has a tmux interface. Each one treats tmux as something the us
 |---|---|---|---|
 | Price | $2.99 once | Free. Pro is $15 a month or $119 a year | Subscription, price not checked |
 | Saved hosts | Yes | Yes, local only | Yes |
-| Keys | Imported keys in the Keychain, Face ID per key. In-app key generation not documented | Generated in the Secure Enclave with Face ID. Ed25519 not named | Key pairs made in the app |
+| Jump hosts | Not documented | Host chaining | `ProxyJump` in the host's `ssh_config` |
+| Keys (Kessik since 2026-10-16: made in the app, ed25519 or a Secure Enclave P-256 key with Face ID, or an ed25519 OpenSSH key imported by paste or from Files) | Imported keys in the Keychain, Face ID per key. In-app key generation not documented | Generated in the Secure Enclave with Face ID. Ed25519 not named | Key pairs made in the app |
 | Mosh | Built in, and can install `mosh-server` on the host | Free | Built in |
 | tmux | Typed by the user | Startup command | Typed by the user, inside Mosh |
 | Snippets | Not documented | One-tap snippets, free | Snips |
 | Extra keys | Esc, Ctrl, Tab, `~ \| / -`, drag for arrows, long-press repeat | Editable bar, drag gestures for arrows | Ctrl, Alt, Esc, arrows, chained modifiers |
 | Themes | Over 390 terminal themes, light and dark | Per-connection themes, including Flexoki Light | A few built in, more from a gallery |
+| Search the scrollback | Not documented | Search in the terminal | Not documented |
 | Background | Mosh sessions survive sleep and backgrounding | iOS stops it within 20 to 30 seconds. Live Activities and location access reduce drops | A "Geo" toggle, mechanism not documented |
 
 Echo needs iOS 26 or later. It uses Ghostty's terminal engine.
@@ -34,6 +36,8 @@ Termius published eight tips for running coding agents on a phone in May 2026. S
 4. Dictation sent as one paste. Termius has a Paste mode above its key bar, so a dictated prompt reaches the terminal in one piece. Added on 2026-10-15: Write a prompt, on the key bar and in the terminal's tools menu, opens a text box. Insert or Send puts the text in as one bracketed paste, and Send adds Return.
 5. Local port forwarding to preview a dev server in the phone's browser. Added on 2026-10-15: Preview a port, in the terminal's tools menu, forwards a port on the phone to the same port on the Mac's localhost over Citadel's direct TCP/IP channels, and opens it in Safari inside the app. Safari stays inside the app because iOS suspends a background app and its listener.
 6. Image upload over SFTP, so a screenshot path can go into a prompt. Added on 2026-10-15: Send an image, in the terminal's tools menu, copies a photo to `/tmp/kessik` on the Mac and types its path. A HEIC photo becomes JPEG, because Claude Code does not read HEIC.
+7. A jump host for each Mac, to reach a Mac that the phone cannot reach on its own. Termius chains hosts and Blink reads `ProxyJump`. Added on 2026-10-16: each saved Mac can have a jump host (hostname, port and username), set under Jump host in the Mac's settings. The app logs in to the jump host and then reaches the Mac through it over Citadel's `jump(to:)`. The host key of each hop is checked against the key first saved for that host, and every connection the app makes (terminal, session list, image upload, port preview, liveness checks and Add to) goes the same way. Kessik takes one jump host per Mac, so a chain of more than two hops is not possible.
+8. Search in the terminal. Termius can search the text in a terminal. Added on 2026-10-16: Search the scrollback, in the terminal's tools menu, reads up to the last 10,000 lines of the tmux session with `tmux capture-pane` on a separate SSH channel, because tmux holds the history and SwiftTerm holds only the visible screen. The search is plain text and ignores case. It shows a match count, highlights each match with the lines around it, and a tap copies the line.
 
 Termius's help center confirms the background limit that SSHTerm already plans around. iOS stops background network activity within 20 to 30 seconds, and tmux plus a fast reattach is the answer all three give for plain SSH. Only Mosh keeps the view itself alive, and Mosh waits for a later SSHTerm version.
 
@@ -42,6 +46,8 @@ Termius's help center confirms the background limit that SSHTerm already plans a
 The app has had Dark, Light and System themes since the light theme commit. Dark is the default. None of the three apps documents a light mode for the app itself. Each one treats light as a terminal color theme that the user picks.
 
 A light terminal has a side effect for Claude Code. Claude Code picks dark or light colors from its `theme` setting, and its `auto` value reads the terminal background with an OSC 11 query when it starts. SwiftTerm answers that query (`reportColor` in its `Terminal.swift`). However, tmux sits between the two, and a Claude session keeps the colors it chose at launch even when the phone later shows it on a different background. An open issue from August 2026 also reports that `auto` picks the opposite theme on some terminals. The result can be Claude Code's dark-theme colors on a white background.
+
+Kessik has per-Mac terminal colors since 2026-10-16, the same idea as Termius's per-connection themes. Each saved Mac can use the app's palette or its own built-in or imported palette, and a Mac whose imported palette is deleted goes back to the app's palette. The OSC 11 side effect above applies per Mac: a Mac with a light palette can show Claude Code's dark-theme colors, because tmux keeps the colors Claude chose at launch.
 
 ## Sources
 
