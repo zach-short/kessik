@@ -78,6 +78,7 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         stack.addArrangedSubview(key(icon: "arrow.right.to.line", label: "Tab") { $0.send([0x09]) })
         // Claude Code cycles its modes (default, accept edits, plan) on Shift+Tab.
         stack.addArrangedSubview(key(icon: "arrow.left.to.line", label: "Shift Tab") { $0.send(EscapeSequences.cmdBackTab) })
+        stack.addArrangedSubview(dragPad())
         stack.addArrangedSubview(arrow("arrow.left", app: EscapeSequences.moveLeftApp, normal: EscapeSequences.moveLeftNormal))
         stack.addArrangedSubview(arrow("arrow.up", app: EscapeSequences.moveUpApp, normal: EscapeSequences.moveUpNormal))
         stack.addArrangedSubview(arrow("arrow.down", app: EscapeSequences.moveDownApp, normal: EscapeSequences.moveDownNormal))
@@ -160,6 +161,46 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
             self?.repeatTimer = nil
         }, for: [.touchUpInside, .touchUpOutside, .touchCancel])
         return button
+    }
+
+    /// A key you drag like a trackpad: every `step` points of travel sends one arrow key.
+    private func dragPad() -> UIButton {
+        let button = key(icon: "arrow.up.and.down.and.arrow.left.and.right", label: "Drag for arrows")
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(dragPadPanned(_:)))
+        button.addGestureRecognizer(pan)
+        return button
+    }
+
+    private var dragRemainder = CGPoint.zero
+
+    @objc private func dragPadPanned(_ pan: UIPanGestureRecognizer) {
+        guard let terminal else { return }
+        let step: CGFloat = 18
+        switch pan.state {
+        case .began:
+            dragRemainder = .zero
+            pan.setTranslation(.zero, in: pan.view)
+        case .changed:
+            let t = pan.translation(in: pan.view)
+            dragRemainder.x += t.x
+            dragRemainder.y += t.y
+            pan.setTranslation(.zero, in: pan.view)
+            let app = terminal.getTerminal().applicationCursor
+            func send(_ appKey: [UInt8], _ normal: [UInt8]) {
+                terminal.send(app ? appKey : normal)
+                if hapticsEnabled { tapHaptic.impactOccurred(intensity: 0.5) }
+            }
+            while abs(dragRemainder.x) >= step {
+                if dragRemainder.x > 0 { send(EscapeSequences.moveRightApp, EscapeSequences.moveRightNormal); dragRemainder.x -= step }
+                else { send(EscapeSequences.moveLeftApp, EscapeSequences.moveLeftNormal); dragRemainder.x += step }
+            }
+            while abs(dragRemainder.y) >= step {
+                if dragRemainder.y > 0 { send(EscapeSequences.moveDownApp, EscapeSequences.moveDownNormal); dragRemainder.y -= step }
+                else { send(EscapeSequences.moveUpApp, EscapeSequences.moveUpNormal); dragRemainder.y += step }
+            }
+        default:
+            dragRemainder = .zero
+        }
     }
 
     // MARK: Actions

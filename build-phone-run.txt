@@ -1,0 +1,27 @@
+==> Building Debug for 00008150-0010050A0247801C  (build 202610160056)
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project SSHTerm.xcodeproj -scheme SSHTerm -configuration Debug -destination id=00008150-0010050A0247801C -allowProvisioningUpdates -skipPackagePluginValidation -skipMacroValidation -derivedDataPath build CURRENT_PROJECT_VERSION=202610160056 build
+
+Build settings from command line:
+    CURRENT_PROJECT_VERSION = 202610160056
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  swift-collections: https://github.com/apple/swift-collections.git @ 1.7.3
+  swift-log: https://github.com/apple/swift-log.git @ 1.16.1
+  Citadel: https://github.com/orlandos-nl/Citadel @ 0.12.0
+  Lottie: https://github.com/airbnb/lottie-spm @ 4.6.1
+  swift-system: https://github.com/apple/swift-system.git @ 1.8.1
+  swift-asn1: https://github.com/apple/swift-asn1.git @ 1.7.3
+  swift-argument-parser: https://github.com/apple/swift-argument-parser @ 1.8.2
+  swift-nio-ssh: https://github.com/Joannis/swift-nio-ssh @ 0.3.5
+  swift-nio: https://github.com/apple/swift-nio.git @ 2.104.0
+  swift-atomics: https://github.com/apple/swift-atomics.git @ 1.3.1
+  swift-crypto: https://github.com/apple/swift-crypto.git @ 3.15.1
+  SwiftTerm: https://github.com/migueldeicaza/SwiftTerm @ 1.19.0
+  BigInt: https://github.com/attaswift/BigInt.git @ 5.7.0
+
+2026-10-15 20:57:21.367 xcodebuild[26491:2575682] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+ComputePackagePrebuildTargetDependencyGraph
