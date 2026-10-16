@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+#
+# kessik — one name for everything this repo gets told to do.
+#
+#   kessik                   the menu
+#   kessik phone             build Debug and run it on the connected iPhone
+#   kessik gen               regenerate SSHTerm.xcodeproj from project.yml
+#   kessik open              open the project in Xcode
+#   kessik log               the tail of the last phone build log
+#   kessik shell             print the three lines that go in ~/.zshrc
+#
+# The app is named Kessik. The Xcode target is still SSHTerm, so the scheme and project
+# keep that name. This file only wraps the commands; the build settings live in project.yml
+# and Config/.
+#
+# It lives in scripts/ rather than in ~/.zshrc so that it is version-controlled next to the
+# project it builds. The shell side stays three lines and never needs editing again.
+# Signing values come from Config/Local.xcconfig (git-ignored).
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+if [[ -t 1 ]]; then B=$'\033[1m'; D=$'\033[2m'; O=$'\033[0m'; else B=''; D=''; O=''; fi
+say()  { printf '%s==>%s %s\n' "$B" "$O" "$*"; }
+die()  { printf 'kessik: %s\n' "$*" >&2; exit 1; }
+
+SCHEME="SSHTerm"
+PROJECT="SSHTerm.xcodeproj"
+APP_NAME="SSHTerm.app"
+
+# Both IDs are looked up here, not written down. xcodebuild wants the UDID; devicectl wants the
+# CoreDevice identifier. They are different strings for the same phone.
+phone_udid() {
+  xcrun xctrace list devices 2>/dev/null | grep 'iPhone' | grep -v 'Simulator' \
+    | grep -oE '\([0-9A-Fa-f-]{25,}\)$' | tr -d '()' | head -1
+}
+phone_device() {
+  xcrun devicectl list devices 2>/dev/null | grep 'available' \
+    | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | head -1
+}
+
+# The build log is kept so a failed run can be read later without scrolling. A background run
+# reports the wrapper's exit code, so the errors are also pulled out of the log.
+LOG="$ROOT/build/last-phone.log"
+run_logged() {
+  mkdir -p "$ROOT/build"
+  if "$@" 2>&1 | tee "$LOG"; then return 0; fi
+  printf '\n%skessik: that failed.%s The lines that say why:\n\n' "$B" "$O" >&2
+  grep -nE 'error:|BUILD FAILED' "$LOG" | awk '!seen[substr($0, index($0, ":") + 1)]++' | head -20 >&2 || true
+  printf '\n  the whole log: %s\n' "$LOG" >&2
+  return 1
+}
+
+cmd_phone() {
+  local udid dev app stamp
+  # project.yml pins CURRENT_PROJECT_VERSION to 1. Without a stamp, every local build calls
+  # itself "1.1 (1)", so a fresh install cannot be told from a stale one. Stamp a UTC time.
+  stamp="$(date -u +%Y%m%d%H%M)"
+
+  # Both lookups happen before the build. The build takes minutes, and a missing phone found
+  # afterwards means doing it all again.
+  udid="$(phone_udid)"
+  [[ -n "$udid" ]] || die "no iPhone among the build destinations.
+  Plug it in, unlock it, tap Trust, and check with:  xcrun xctrace list devices"
+  dev="$(phone_device)"
+  [[ -n "$dev" ]] || die "xcodebuild can see the phone but devicectl calls it unavailable.
+  Unlock it, or unplug and replug it, then check:  xcrun devicectl list devices"
+
+  say "Building Debug for $udid  (build $stamp)"
+  # -skipPackagePluginValidation is required. Without it SwiftTerm's build plugin fails with
+  # "Validate plug-in" and no other error.
+  run_logged xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug \
+    -destination "id=$udid" -allowProvisioningUpdates \
+    -skipPackagePluginValidation -skipMacroValidation \
+    -derivedDataPath build CURRENT_PROJECT_VERSION="$stamp" build
+
+  app="build/Build/Products/Debug-iphoneos/$APP_NAME"
+  [[ -d "$app" ]] || die "the build left no app at $app"
+
+  # project.yml holds $(SSHTERM_BUNDLE_ID), a value from the git-ignored Local.xcconfig. The
+  # built Info.plist has the resolved ID, so read it there. The raw project.yml value would
+  # reach devicectl unexpanded and fail with "application $(SSHTERM_BUNDLE_ID) is not installed".
+  BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")"
+  [[ -n "$BUNDLE_ID" ]] || die "could not read the bundle ID from $app/Info.plist"
+
+  say "Installing"
+  xcrun devicectl device install app --device "$dev" "$app"
+  say "Launching"
+  xcrun devicectl device process launch --device "$dev" "$BUNDLE_ID"
+  printf '\n%sRunning on the phone. Build %s.%s\n' "$D" "$stamp" "$O"
+}
+
+cmd_gen() {
+  xcodegen generate --spec project.yml --project .
+}
+
+cmd_log() {
+  [[ -f "$LOG" ]] || die "no log yet. Run: kessik phone"
+  tail -n 80 "$LOG"
+}
+
+cmd_shell() {
+  cat <<SNIPPET
+# kessik: the app's own commands, from anywhere. \`kessik\` alone prints the menu.
+kessik() {
+  if [[ "\$1" == "cd" ]]; then cd "$ROOT"; else "$ROOT/scripts/kessik" "\$@"; fi
+}
+SNIPPET
+}
+
+menu() {
+  cat <<MENU
+${B}kessik${O}  the Kessik app (SSHTerm target)
+
+  phone     build Debug and run it on the connected iPhone
+  gen       regenerate SSHTerm.xcodeproj from project.yml
+  open      open the project in Xcode
+  log       the tail of the last phone build log
+  shell     print the three lines that go in ~/.zshrc
+  help      this menu
+
+  ${D}kessik cd jumps to the repo once the shell lines are in place.${O}
+MENU
+}
+
+case "${1:-help}" in
+  phone) shift; cmd_phone "$@" ;;
+  gen)   shift; cmd_gen "$@" ;;
+  open)  shift; open "$PROJECT" ;;
+  log)   shift; cmd_log "$@" ;;
+  shell) shift; cmd_shell ;;
+  help|-h|--help) menu ;;
+  *)     printf 'kessik: no command %s\n\n' "$1" >&2; menu >&2; exit 1 ;;
+esac
