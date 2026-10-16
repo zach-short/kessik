@@ -32,6 +32,24 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = .hosts
 
+    /// A horizontal drag that ends far enough and fast enough moves one page.
+    /// The vertical check keeps scrolling lists from changing pages.
+    private var pageSwipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > abs(dy) * 2, abs(dx) > 80 else { return }
+                let pages = AppTab.allCases
+                guard let index = pages.firstIndex(of: tab) else { return }
+                let next = dx < 0 ? index + 1 : index - 1
+                guard pages.indices.contains(next) else { return }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    tab = pages[next]
+                }
+            }
+    }
+
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
@@ -42,6 +60,8 @@ struct RootView: View {
             case .settings: SettingsView()
             }
         }
+        // Swipe left or right to move to the next or previous page.
+        .simultaneousGesture(pageSwipe)
         .environment(\.showTab) { tab = $0 }
         .safeAreaInset(edge: .bottom) {
             PillTabBar(selection: $tab)
