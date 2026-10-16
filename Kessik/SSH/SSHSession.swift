@@ -72,9 +72,8 @@ final class SSHSession {
     func connect(password: String?, remember: Bool = true) {
         let host = host
         let typed = password
-        let password = password ?? SavedPassword.get(for: host)
         open {
-            let client = try await SSHClient.connect(to: host, password: password)
+            let client = try await SSHClient.connect(to: host, typed: typed)
             if let typed {
                 if remember { SavedPassword.save(typed, for: host) } else { SavedPassword.remove(for: host) }
             }

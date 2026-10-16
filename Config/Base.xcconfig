@@ -1,5 +1,7 @@
 // Shared build settings. Safe to commit.
 // Personal values (team ID, bundle ID) go in Local.xcconfig, which git ignores.
 SSHTERM_BUNDLE_ID = com.example.kessik
+// Shown the first time the Require Face ID setting asks for Face ID.
+INFOPLIST_KEY_NSFaceIDUsageDescription = Kessik uses Face ID to unlock your SSH key and saved passwords before it logs in.
 
 #include? "Local.xcconfig"

@@ -10,7 +10,7 @@ struct KessikApp: App {
     init() {
         let store = AppStore()
         _store = State(initialValue: store)
-        _link = State(initialValue: MacLink(host: store.hosts.first ?? .unset))
+        _link = State(initialValue: MacLink(host: store.activeMac ?? .unset))
     }
 
     var body: some Scene {

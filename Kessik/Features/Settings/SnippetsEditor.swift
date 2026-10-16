@@ -1,9 +1,14 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Add, edit, delete and reorder snippets. Replies and commands are separate lists.
+/// Export and Import move them to another phone as a file.
 struct SnippetsEditor: View {
     @Environment(AppStore.self) private var store
     @State private var editing: Snippet?
+    @State private var importing = false
+    @State private var picked: [Snippet]?
+    @State private var notice: Notice?
 
     var body: some View {
         List {
@@ -31,10 +36,65 @@ struct SnippetsEditor: View {
         .scrollContentBackground(.hidden)
         .background(Theme.background)
         .navigationTitle("Snippets")
-        .toolbar { EditButton() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("Export or import", systemImage: "arrow.up.arrow.down.circle") {
+                    ShareLink(item: SnippetsFile(snippets: store.snippets),
+                              preview: SharePreview(SnippetTransfer.fileName)) {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
+                    Button("Import", systemImage: "square.and.arrow.down") { importing = true }
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) { EditButton() }
+        }
         .sheet(item: $editing) { snippet in
             SnippetForm(snippet: snippet, isNew: !store.snippets.contains { $0.id == snippet.id })
         }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+            open(result)
+        }
+        .confirmationDialog(importTitle, isPresented: Binding(get: { picked != nil }, set: { if !$0 { picked = nil } }),
+                            titleVisibility: .visible) {
+            Button("Add to my snippets") { apply(.merge) }
+            Button("Replace my snippets", role: .destructive) { apply(.replace) }
+        } message: {
+            Text("Add keeps your snippets and skips exact copies. Replace removes your snippets first.")
+        }
+        .alert(notice?.title ?? "", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(notice?.message ?? "")
+        }
+    }
+
+    private struct Notice {
+        var title: String
+        var message: String
+    }
+
+    private var importTitle: String {
+        let count = picked?.count ?? 0
+        return count == 1 ? "Import 1 snippet" : "Import \(count) snippets"
+    }
+
+    private func open(_ result: Result<URL, Error>) {
+        do {
+            picked = try SnippetTransfer.read(try result.get())
+        } catch {
+            notice = Notice(title: "Could not import", message: error.localizedDescription)
+        }
+    }
+
+    private func apply(_ mode: SnippetTransfer.Mode) {
+        guard let picked else { return }
+        let before = store.snippets.count
+        store.snippets = SnippetTransfer.combine(store.snippets, with: picked, mode: mode)
+        let added = mode == .merge ? store.snippets.count - before : store.snippets.count
+        let skipped = picked.count - added
+        notice = Notice(title: "Imported",
+                        message: skipped == 0 ? "Added \(added)." : "Added \(added). Skipped \(skipped) that you already have.")
+        self.picked = nil
     }
 
     private func row(_ snippet: Snippet) -> some View {
@@ -118,6 +178,16 @@ private struct SnippetForm: View {
         saved.label = label.isEmpty ? trimmedText : label
         store.save(saved)
         dismiss()
+    }
+}
+
+/// The export file. It holds only label, text and kind, from `SnippetTransfer`.
+private struct SnippetsFile: Transferable {
+    var snippets: [Snippet]
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .json) { try SnippetTransfer.encode($0.snippets) }
+            .suggestedFileName(SnippetTransfer.fileName)
     }
 }
 

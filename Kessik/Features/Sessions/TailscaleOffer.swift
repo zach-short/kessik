@@ -89,8 +89,7 @@ struct TailscaleOffer: View {
         if let password = SavedPassword.get(for: old) {
             SavedPassword.save(password, for: host)
         }
-        SavedMac.save(host)
-        store.hosts = [host]
+        store.saveMac(host, activate: true)
         link.use(host)
         if Credentials.available(for: host) {
             link.connect(password: nil)

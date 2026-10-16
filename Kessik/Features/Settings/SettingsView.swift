@@ -27,7 +27,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                MacSection()
+                MacsSection()
 
                 Section {
                     Picker("Theme", selection: $appearance) {
@@ -35,16 +35,7 @@ struct SettingsView: View {
                             Text(option.label).tag(option)
                         }
                     }
-                    Picker("Terminal colors", selection: $paletteID) {
-                        ForEach(TerminalPalette.all) { palette in
-                            HStack(spacing: 10) {
-                                PaletteSwatch(colors: palette.colors(dark: colorScheme == .dark))
-                                Text(palette.name)
-                            }
-                            .tag(palette.id)
-                        }
-                    }
-                    .pickerStyle(.navigationLink)
+                    TerminalColorsPicker(paletteID: $paletteID) { PaletteSwatch(colors: $0) }
                 } header: {
                     Text("Appearance")
                 } footer: {
@@ -57,6 +48,7 @@ struct SettingsView: View {
                     } label: {
                         LabeledContent("Font", value: MonoFont.named(fontFamily).family)
                     }
+                    NavigationLink("Key bar") { KeyBarEditor() }
                     Stepper(value: $fontSize, in: 9...24, step: 1) {
                         HStack {
                             Text("Text size")
@@ -95,6 +87,7 @@ struct SettingsView: View {
 
                 KeySection()
                 PasswordsSection()
+                LoginLockSection()
 
                 Section("Guides") {
                     ForEach(Guide.all) { guide in
@@ -128,131 +121,6 @@ struct SettingsView: View {
             .background(Theme.background)
             .navigationTitle("Settings")
         }
-    }
-}
-
-/// Where the app logs in: name, hostname, port and username. Edits apply on Save, so typing
-/// does not drop the connection on each key.
-private struct MacSection: View {
-    @Environment(AppStore.self) private var store
-    @Environment(MacLink.self) private var link
-    @State private var name = ""
-    @State private var hostname = ""
-    @State private var port = ""
-    @State private var username = ""
-    @State private var savedNote = false
-    @State private var finding = false
-    @State private var foundNote = false
-    @State private var loaded = false
-
-    var body: some View {
-        Section {
-            Button("Find Macs on this Wi-Fi", systemImage: "wifi") { finding = true }
-            field("Name", prompt: "Mac", text: $name)
-            field("Hostname", prompt: "mac.tailnet.ts.net", text: $hostname, keyboard: .URL)
-            field("Port", prompt: "22", text: $port, keyboard: .numberPad)
-            field("Username", prompt: "whoami on the Mac", text: $username)
-            Button("Save") { save() }
-                .disabled(draft == nil || !changed)
-        } header: {
-            Text("Mac")
-        } footer: {
-            Text(LocalizedStringKey(footer))
-        }
-        .onAppear(perform: load)
-        .onChange(of: [name, hostname, port, username]) { savedNote = false }
-        .sheet(isPresented: $finding) { MacFinderSheet(onPick: fill) }
-    }
-
-    /// Bonjour gives the name, hostname and port. The username stays as typed.
-    private func fill(_ mac: MacFinder.Found) {
-        guard let found = mac.hostname else { return }
-        name = mac.name
-        hostname = found
-        port = mac.port == 22 ? "" : String(mac.port)
-        foundNote = true
-    }
-
-    private func field(_ label: String, prompt: String, text: Binding<String>,
-                       keyboard: UIKeyboardType = .default) -> some View {
-        LabeledContent(label) {
-            TextField(label, text: text, prompt: Text(prompt))
-                .multilineTextAlignment(.trailing)
-                .font(Theme.mono)
-                .foregroundStyle(Theme.textPrimary)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(keyboard)
-        }
-    }
-
-    private var trimmedHostname: String { hostname.trimmingCharacters(in: .whitespaces) }
-    private var trimmedUsername: String { username.trimmingCharacters(in: .whitespaces) }
-
-    private var portNumber: Int? {
-        let text = port.trimmingCharacters(in: .whitespaces)
-        if text.isEmpty { return 22 }
-        return Int(text).flatMap { (1...65535).contains($0) ? $0 : nil }
-    }
-
-    private var hostnameProblem: String? {
-        if trimmedHostname.contains(where: \.isWhitespace) { return "The hostname cannot have spaces." }
-        if trimmedHostname.contains("@") { return "Put the username in its own field." }
-        return nil
-    }
-
-    /// The host to save, or nil while a field is empty or not valid.
-    private var draft: Host? {
-        guard !trimmedHostname.isEmpty, !trimmedUsername.isEmpty, hostnameProblem == nil,
-              !trimmedUsername.contains(where: \.isWhitespace), let portNumber else { return nil }
-        let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        var host = link.host.isSet ? link.host : Host.unset
-        host.name = trimmedName.isEmpty ? "Mac" : trimmedName
-        host.hostname = trimmedHostname
-        host.port = portNumber
-        host.username = trimmedUsername
-        return host
-    }
-
-    private var changed: Bool {
-        guard let draft else { return false }
-        return !link.host.isSet || !draft.sameLogin(as: link.host) || draft.name != link.host.name
-    }
-
-    private var footer: String {
-        if let hostnameProblem { return hostnameProblem }
-        if portNumber == nil { return "The port is a number from 1 to 65535." }
-        if savedNote { return "Saved. The Sessions tab uses this Mac." }
-        if let draft, link.host.isSet, !draft.sameLogin(as: link.host), link.state == .connected {
-            return "Saving disconnects from \(link.host.hostname) and closes its open terminals."
-        }
-        if foundNote {
-            return trimmedUsername.isEmpty
-                ? "Enter the Mac's username, then tap Save. Run `whoami` on the Mac to get it."
-                : "Tap Save to use this Mac. A `.local` name works only on this Wi-Fi."
-        }
-        return "Use the Mac's Tailscale name or 100.x address. Run `whoami` on the Mac to get the username."
-    }
-
-    /// Once per visit to the tab. The section appears again when the finder sheet closes, and a
-    /// second load would replace the Mac the user just picked.
-    private func load() {
-        guard !loaded else { return }
-        loaded = true
-        let host = link.host
-        name = host.isSet ? host.name : ""
-        hostname = host.hostname
-        port = host.isSet && host.port != 22 ? String(host.port) : ""
-        username = host.username
-    }
-
-    private func save() {
-        guard let host = draft else { return }
-        SavedMac.save(host)
-        store.hosts = [host]
-        link.use(host)
-        savedNote = true
-        foundNote = false
     }
 }
 

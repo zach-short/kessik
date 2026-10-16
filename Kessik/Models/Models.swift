@@ -28,30 +28,118 @@ struct Host: Identifiable, Codable, Hashable {
     }
 }
 
-/// The Mac set in Settings, which the Sessions tab and the Hosts list use. Passwords stay in the Keychain.
-enum SavedMac {
-    private static let key = "savedMac"
+/// The saved Macs and the active one, which the Sessions tab and its terminals use. A plain value,
+/// so the rules test without the app. `SavedMacs` stores it.
+struct MacList: Equatable {
+    private(set) var macs: [Host]
+    private(set) var activeID: UUID?
 
-    static func load() -> Host? {
-        let defaults = UserDefaults.standard
-        if let data = defaults.data(forKey: key), let host = try? JSONDecoder().decode(Host.self, from: data) {
-            return host
-        }
-        // The Sessions connect card kept a typed address before Settings had a Mac section.
-        if let typed = defaults.string(forKey: SettingsKey.sessionsAddress), var host = Host(quickConnect: typed) {
-            host.name = "Mac"
-            save(host)
-            return host
-        }
-        return nil
+    init(macs: [Host] = [], activeID: UUID? = nil) {
+        self.macs = macs
+        self.activeID = activeID
+        settle()
     }
 
-    static func save(_ host: Host) {
-        var host = host
-        host.status = .unknown
-        if let data = try? JSONEncoder().encode(host) {
-            UserDefaults.standard.set(data, forKey: key)
+    var active: Host? { macs.first { $0.id == activeID } }
+
+    /// Replaces the Mac with the same id, or adds it at the end. The first Mac becomes the active one.
+    mutating func save(_ host: Host) {
+        if let index = macs.firstIndex(where: { $0.id == host.id }) {
+            macs[index] = host
+        } else {
+            macs.append(host)
         }
+        settle()
+    }
+
+    mutating func remove(_ id: UUID) {
+        macs.removeAll { $0.id == id }
+        settle()
+    }
+
+    /// Does nothing for an id that is not in the list.
+    mutating func setActive(_ id: UUID) {
+        guard macs.contains(where: { $0.id == id }) else { return }
+        activeID = id
+    }
+
+    /// Another saved Mac logs in to the same target, so the Keychain password and host key are still in use.
+    func sharesLogin(with host: Host) -> Bool {
+        macs.contains { $0.id != host.id && $0.sameLogin(as: host) }
+    }
+
+    /// Keeps the active id on a saved Mac. When the active Mac goes, the first one left takes its place.
+    private mutating func settle() {
+        if !macs.contains(where: { $0.id == activeID }) {
+            activeID = macs.first?.id
+        }
+    }
+}
+
+/// Keeps the Mac list in UserDefaults. Passwords stay in the Keychain, keyed by login target, so the
+/// list holds no secrets.
+struct SavedMacs {
+    static let listKey = "savedMacs"
+    static let activeKey = "activeMac"
+    /// The one Mac of earlier versions. It is moved into the list on first load and then kept equal
+    /// to the active Mac, so an older build still finds a Mac.
+    static let legacyKey = "savedMac"
+
+    var defaults: UserDefaults = .standard
+
+    func load() -> MacList {
+        if let data = defaults.data(forKey: Self.listKey), let macs = try? JSONDecoder().decode([Host].self, from: data) {
+            return MacList(macs: macs, activeID: defaults.string(forKey: Self.activeKey).flatMap(UUID.init(uuidString:)))
+        }
+        return migrate()
+    }
+
+    func save(_ list: MacList) {
+        let macs = list.macs.map { host in
+            var host = host
+            host.status = .unknown
+            return host
+        }
+        guard let data = try? JSONEncoder().encode(macs) else { return }
+        defaults.set(data, forKey: Self.listKey)
+        let active = macs.first { $0.id == list.activeID }
+        if let active, let legacy = try? JSONEncoder().encode(active) {
+            defaults.set(active.id.uuidString, forKey: Self.activeKey)
+            defaults.set(legacy, forKey: Self.legacyKey)
+        } else {
+            defaults.removeObject(forKey: Self.activeKey)
+            defaults.removeObject(forKey: Self.legacyKey)
+        }
+    }
+
+    /// The Mac from `savedMac` becomes the first and active entry. Before Settings had a Mac section,
+    /// the Sessions connect card kept a typed address instead.
+    private func migrate() -> MacList {
+        var list = MacList()
+        if let data = defaults.data(forKey: Self.legacyKey), let host = try? JSONDecoder().decode(Host.self, from: data) {
+            list.save(host)
+        } else if let typed = defaults.string(forKey: SettingsKey.sessionsAddress), var host = Host(quickConnect: typed) {
+            host.name = "Mac"
+            list.save(host)
+        }
+        if !list.macs.isEmpty { save(list) }
+        return list
+    }
+}
+
+/// The active Mac, for code that uses one Mac. See `SavedMacs` for the whole list.
+enum SavedMac {
+    static func load() -> Host? {
+        SavedMacs().load().active
+    }
+
+    /// Adds the Mac, or replaces the saved Mac with its id, and makes it the active one.
+    static func save(_ host: Host) {
+        let saved = SavedMacs()
+        var list = saved.load()
+        list.save(host)
+        list.setActive(host.id)
+        saved.save(list)
     }
 }
 
@@ -83,20 +171,58 @@ struct TmuxSession: Identifiable, Hashable {
 
 @Observable
 final class AppStore {
-    var hosts: [Host]
+    /// The saved Macs. Change them through `saveMac`, `useMac` and `removeMac`, which store each change.
+    private(set) var macs: MacList
     var sessions: [TmuxSession]
     /// Kept grouped by kind, in the order Settings shows them. The app root saves each change.
     var snippets: [Snippet]
+    /// Nil in previews, which keep their Macs in memory.
+    private let savedMacs: SavedMacs?
 
-    init(hosts: [Host] = [], sessions: [TmuxSession] = [], snippets: [Snippet] = SavedSnippets.defaults) {
-        self.hosts = hosts
+    var hosts: [Host] { macs.macs }
+    /// The Mac the Sessions tab and its terminals use.
+    var activeMac: Host? { macs.active }
+
+    init(hosts: [Host] = [], sessions: [TmuxSession] = [], snippets: [Snippet] = SavedSnippets.defaults,
+         savedMacs: SavedMacs? = nil) {
+        self.macs = savedMacs?.load() ?? MacList(macs: hosts)
         self.sessions = sessions
         self.snippets = snippets
+        self.savedMacs = savedMacs
     }
 
-    /// The Mac from Settings, or no hosts on a fresh install. Sessions come from the Mac.
+    /// The Macs from Settings, or none on a fresh install. Sessions come from the Mac.
     convenience init() {
-        self.init(hosts: SavedMac.load().map { [$0] } ?? [], sessions: [], snippets: SavedSnippets.load())
+        self.init(sessions: [], snippets: SavedSnippets.load(), savedMacs: SavedMacs())
+    }
+
+    /// Adds a Mac or edits one. `activate` makes it the Mac the Sessions tab uses.
+    func saveMac(_ host: Host, activate: Bool) {
+        changeMacs {
+            $0.save(host)
+            if activate { $0.setActive(host.id) }
+        }
+    }
+
+    func useMac(_ host: Host) {
+        changeMacs { $0.setActive(host.id) }
+    }
+
+    /// Also forgets the Mac's saved password, unless another saved Mac logs in to the same target.
+    func removeMac(_ host: Host) {
+        changeMacs { $0.remove(host.id) }
+        if !macs.sharesLogin(with: host) {
+            SavedPassword.remove(for: host)
+        }
+    }
+
+    /// The session list belongs to the active Mac, so it empties when the active login changes.
+    private func changeMacs(_ change: (inout MacList) -> Void) {
+        let before = macs.active
+        change(&macs)
+        let sameLogin = before.flatMap { old in macs.active.map { old.sameLogin(as: $0) } } ?? false
+        if !sameLogin { sessions = [] }
+        savedMacs?.save(macs)
     }
 
     func snippets(_ kind: Snippet.Kind) -> [Snippet] {

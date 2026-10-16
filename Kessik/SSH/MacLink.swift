@@ -3,12 +3,14 @@ import Observation
 import Citadel
 
 extension SSHClient {
-    /// Key, then password login, with the app's host key check and timeout.
-    static func connect(to host: Host, password: String?) async throws -> SSHClient {
-        try await SSHClient.connect(
+    /// Key, then password login, with the app's host key check and timeout. `typed` nil means the
+    /// saved password. The gate reads both from the Keychain, after Face ID when Settings asks for it.
+    static func connect(to host: Host, typed: String?, gate: LoginGate = .live) async throws -> SSHClient {
+        let secrets = try await gate.secrets(for: host, typed: typed)
+        return try await SSHClient.connect(
             host: host.hostname,
             port: host.port,
-            authenticationMethod: .custom(LoginMethods(username: host.username, key: DeviceKey.load(), password: password)),
+            authenticationMethod: .custom(LoginMethods(username: host.username, key: secrets.key, password: secrets.password)),
             hostKeyValidator: .custom(TOFUHostKeyValidator(host: host.hostname, port: host.port)),
             reconnect: .never,
             connectTimeout: .seconds(10)
@@ -139,8 +141,7 @@ final class MacLink {
         let gen = generation
         let host = host
         let typed = password
-        let password = password ?? SavedPassword.get(for: host)
-        let task = Task { try await SSHClient.connect(to: host, password: password) }
+        let task = Task { try await SSHClient.connect(to: host, typed: typed) }
         connecting = task
 
         do {

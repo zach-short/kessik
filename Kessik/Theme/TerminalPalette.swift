@@ -25,9 +25,12 @@ struct TerminalPalette: Identifiable, Equatable {
         isDark ? dark : (light ?? dark)
     }
 
-    /// The stored id's palette, or Default when the id is unknown.
-    static func named(_ id: String) -> TerminalPalette {
-        all.first { $0.id == id } ?? .standard
+    /// The stored id's palette, built in or imported, or Default when the id is unknown,
+    /// as it is after an imported palette is deleted.
+    static func named(_ id: String, defaults: UserDefaults = .standard) -> TerminalPalette {
+        if let builtIn = all.first(where: { $0.id == id }) { return builtIn }
+        guard id.hasPrefix(CustomPalettes.idPrefix) else { return .standard }
+        return CustomPalettes(defaults: defaults).palettes.first { $0.id == id } ?? .standard
     }
 
     static let defaultID = "default"

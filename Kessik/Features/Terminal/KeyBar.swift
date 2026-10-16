@@ -6,6 +6,8 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
     private weak var terminal: TerminalView?
     private let stack = UIStackView()
     private var ctrlButton: UIButton!
+    /// The user's keys from Settings. See `KeyBarKeys`.
+    private var extraButtons: [UIButton] = []
     private var repeatTimer: Timer?
     private let tapHaptic = UIImpactFeedbackGenerator(style: .light)
     private let copyHaptic = UINotificationFeedbackGenerator()
@@ -28,6 +30,10 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         NotificationCenter.default.addObserver(
             self, selector: #selector(ctrlReset),
             name: .terminalViewControlModifierReset, object: terminal
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(reloadExtraKeys),
+            name: .keyBarKeysChanged, object: nil
         )
     }
 
@@ -85,9 +91,7 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         stack.addArrangedSubview(arrow("arrow.up", app: EscapeSequences.moveUpApp, normal: EscapeSequences.moveUpNormal))
         stack.addArrangedSubview(arrow("arrow.down", app: EscapeSequences.moveDownApp, normal: EscapeSequences.moveDownNormal))
         stack.addArrangedSubview(arrow("arrow.right", app: EscapeSequences.moveRightApp, normal: EscapeSequences.moveRightNormal))
-        for symbol in ["|", "~", "/", "-", "`", "$", "&", "*", "\\"] {
-            stack.addArrangedSubview(key(symbol) { $0.send(txt: symbol) })
-        }
+        reloadExtraKeys()
 
         fixed.addArrangedSubview(key(icon: "square.and.pencil", label: "Write a prompt") { [weak self] _ in self?.onCompose?() })
         fixed.addArrangedSubview(key(icon: "doc.on.doc", label: "Copy", tapFeedback: false) { [weak self] t in self?.copy(from: t) })
@@ -217,6 +221,14 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         }
         UIDevice.current.playInputClick()
         if hapticsEnabled { copyHaptic.notificationOccurred(.success) }
+    }
+
+    @objc private func reloadExtraKeys() {
+        extraButtons.forEach { $0.removeFromSuperview() }
+        extraButtons = KeyBarKeys.load().map { extra in
+            key(extra.title, label: extra.label) { $0.send(extra.bytes(applicationCursor: $0.getTerminal().applicationCursor)) }
+        }
+        extraButtons.forEach(stack.addArrangedSubview)
     }
 
     @objc private func ctrlReset() {
