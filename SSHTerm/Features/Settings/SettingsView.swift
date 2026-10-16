@@ -6,17 +6,31 @@ enum SettingsKey {
     /// Read once to move an address typed before Settings had a Mac section. See `SavedMac`.
     static let sessionsAddress = "sessionsAddress"
     static let rememberPasswords = "rememberPasswords"
+    static let appearance = "appearance"
 }
 
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
     @AppStorage(SettingsKey.terminalFontSize) private var fontSize = 13.0
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
+    @AppStorage(SettingsKey.appearance) private var appearance = AppAppearance.dark
 
     var body: some View {
         NavigationStack {
             Form {
                 MacSection()
+
+                Section {
+                    Picker("Theme", selection: $appearance) {
+                        ForEach(AppAppearance.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("System follows the iOS light or dark setting.")
+                }
 
                 Section("Terminal") {
                     Stepper(value: $fontSize, in: 9...24, step: 1) {
@@ -54,8 +68,32 @@ struct SettingsView: View {
                 KeySection()
                 PasswordsSection()
 
+                Section("Guides") {
+                    ForEach(Guide.all) { guide in
+                        NavigationLink {
+                            GuideView(guide: guide, from: .settings)
+                        } label: {
+                            Label(guide.title, systemImage: guide.symbol)
+                        }
+                    }
+                }
+
                 Section {
-                    LabeledContent("Version", value: Bundle.main.shortVersion)
+                    HStack(spacing: 14) {
+                        Image("AppMark")
+                            .resizable()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("SSHTerm")
+                                .font(.headline)
+                            Text("Version \(Bundle.main.shortVersion)")
+                                .font(Theme.mono)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                    .padding(.vertical, 2)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -75,9 +113,13 @@ private struct MacSection: View {
     @State private var port = ""
     @State private var username = ""
     @State private var savedNote = false
+    @State private var finding = false
+    @State private var foundNote = false
+    @State private var loaded = false
 
     var body: some View {
         Section {
+            Button("Find Macs on this Wi-Fi", systemImage: "wifi") { finding = true }
             field("Name", prompt: "Mac", text: $name)
             field("Hostname", prompt: "mac.tailnet.ts.net", text: $hostname, keyboard: .URL)
             field("Port", prompt: "22", text: $port, keyboard: .numberPad)
@@ -91,6 +133,16 @@ private struct MacSection: View {
         }
         .onAppear(perform: load)
         .onChange(of: [name, hostname, port, username]) { savedNote = false }
+        .sheet(isPresented: $finding) { MacFinderSheet(onPick: fill) }
+    }
+
+    /// Bonjour gives the name, hostname and port. The username stays as typed.
+    private func fill(_ mac: MacFinder.Found) {
+        guard let found = mac.hostname else { return }
+        name = mac.name
+        hostname = found
+        port = mac.port == 22 ? "" : String(mac.port)
+        foundNote = true
     }
 
     private func field(_ label: String, prompt: String, text: Binding<String>,
@@ -146,10 +198,19 @@ private struct MacSection: View {
         if let draft, link.host.isSet, !draft.sameLogin(as: link.host), link.state == .connected {
             return "Saving disconnects from \(link.host.hostname) and closes its open terminals."
         }
+        if foundNote {
+            return trimmedUsername.isEmpty
+                ? "Enter the Mac's username, then tap Save. Run `whoami` on the Mac to get it."
+                : "Tap Save to use this Mac. A `.local` name works only on this Wi-Fi."
+        }
         return "Use the Mac's Tailscale name or 100.x address. Run `whoami` on the Mac to get the username."
     }
 
+    /// Once per visit to the tab. The section appears again when the finder sheet closes, and a
+    /// second load would replace the Mac the user just picked.
     private func load() {
+        guard !loaded else { return }
+        loaded = true
         let host = link.host
         name = host.isSet ? host.name : ""
         hostname = host.hostname
@@ -163,6 +224,7 @@ private struct MacSection: View {
         store.hosts = [host]
         link.use(host)
         savedNote = true
+        foundNote = false
     }
 }
 

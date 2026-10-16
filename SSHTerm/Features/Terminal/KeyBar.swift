@@ -21,7 +21,7 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         self.terminal = terminal
         super.init(frame: CGRect(x: 0, y: 0, width: 0, height: 44), inputViewStyle: .keyboard)
         allowsSelfSizing = true
-        backgroundColor = UIColor(Theme.background)
+        backgroundColor = Theme.uiBackground
         build()
         NotificationCenter.default.addObserver(
             self, selector: #selector(ctrlReset),
@@ -99,7 +99,7 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         var config = UIButton.Configuration.filled()
         config.cornerStyle = .medium
         config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10)
-        config.baseForegroundColor = UIColor(Theme.textPrimary)
+        config.baseForegroundColor = Theme.uiTextPrimary
         if let title {
             var attributes = AttributeContainer()
             attributes.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .medium)
@@ -113,8 +113,8 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         button.configurationUpdateHandler = { button in
             var config = button.configuration
             config?.baseBackgroundColor = button.isSelected || button.isHighlighted
-                ? UIColor(Theme.accent).withAlphaComponent(0.35)
-                : UIColor(Theme.surfaceRaised)
+                ? Theme.uiAccent.withAlphaComponent(0.35)
+                : Theme.uiSurfaceRaised
             button.configuration = config
         }
         button.widthAnchor.constraint(greaterThanOrEqualToConstant: 38).isActive = true

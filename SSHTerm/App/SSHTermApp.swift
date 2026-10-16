@@ -5,6 +5,7 @@ struct SSHTermApp: App {
     @State private var store: AppStore
     @State private var link: MacLink
     @State private var showSplash = true
+    @AppStorage(SettingsKey.appearance) private var appearance = AppAppearance.dark
 
     init() {
         let store = AppStore()
@@ -26,7 +27,7 @@ struct SSHTermApp: App {
             }
             .environment(store)
             .environment(link)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(appearance.colorScheme)
             .tint(Theme.accent)
             .onChange(of: store.snippets) { _, snippets in SavedSnippets.save(snippets) }
         }

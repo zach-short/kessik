@@ -34,7 +34,7 @@ private struct PlainTextView: UIViewRepresentable {
         view.font = UIFontMetrics(forTextStyle: .footnote)
             .scaledFont(for: .monospacedSystemFont(ofSize: 13, weight: .regular))
         view.adjustsFontForContentSizeCategory = true
-        view.textColor = UIColor(Theme.textPrimary)
+        view.textColor = Theme.uiTextPrimary
         view.backgroundColor = .clear
         view.isScrollEnabled = false
         view.textContainerInset = .zero

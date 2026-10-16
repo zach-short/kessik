@@ -9,23 +9,30 @@ struct TerminalHostView: UIViewRepresentable {
 
     let session: SSHSession
     var fontSize: Double
+    let watch: ScreenWatch
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(session: session)
+        Coordinator(session: session, watch: watch)
     }
 
     func makeUIView(context: Context) -> TerminalView {
         let view = TerminalView(frame: .zero)
         view.terminalDelegate = context.coordinator
-        view.nativeBackgroundColor = UIColor(Theme.background)
-        view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
+        view.nativeBackgroundColor = Theme.uiBackground
+        view.nativeForegroundColor = Theme.uiTerminalText
         view.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         view.optionAsMetaKey = true
         view.inputAccessoryView = KeyBar(terminal: view)
         view.addGestureRecognizer(UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinch(_:))))
+        // Taps, long press and text selection work as in a plain shell. Without this, SwiftTerm
+        // sends them to tmux (mouse on) as clicks and drags. Only WheelScroller sends mouse events.
+        view.allowMouseReporting = false
+        context.coordinator.scroller = WheelScroller(view: view) { [weak watch] in watch?.didSwipeUp() }
+        watch.terminal = view
 
-        session.onOutput = { [weak view] bytes in
+        session.onOutput = { [weak view, weak watch] bytes in
             view?.feed(byteArray: bytes)
+            watch?.screenChanged()
         }
         DispatchQueue.main.async { _ = view.becomeFirstResponder() }
         return view
@@ -43,10 +50,13 @@ struct TerminalHostView: UIViewRepresentable {
 
     final class Coordinator: NSObject, TerminalViewDelegate {
         let session: SSHSession
+        let watch: ScreenWatch
+        var scroller: WheelScroller?
         private var pinchStartSize: CGFloat = 0
 
-        init(session: SSHSession) {
+        init(session: SSHSession, watch: ScreenWatch) {
             self.session = session
+            self.watch = watch
         }
 
         /// Steps the text size in whole points, so the shell gets a resize only when the size
@@ -68,7 +78,11 @@ struct TerminalHostView: UIViewRepresentable {
         }
 
         func send(source: TerminalView, data: ArraySlice<UInt8>) {
-            MainActor.assumeIsolated { session.send(Array(data)) }
+            MainActor.assumeIsolated {
+                // A typed key while tmux shows its history goes to the program, not to tmux.
+                if scroller?.isSending != true { watch.leaveHistory() }
+                session.send(Array(data))
+            }
         }
 
         func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
