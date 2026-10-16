@@ -58,7 +58,7 @@ Tailscale is optional. It is the way to reach the Mac away from home.
 
 ## Build and run
 
-The Xcode project is generated from `project.yml` by [XcodeGen](https://github.com/yonaskolb/XcodeGen), and `SSHTerm.xcodeproj` is not committed. The app was built with Xcode 26.6. The Xcode target, the scheme and the `SSHTerm` source folder keep the name the project had before the app was renamed to Kessik.
+The Xcode project is generated from `project.yml` by [XcodeGen](https://github.com/yonaskolb/XcodeGen), and `Kessik.xcodeproj` is not committed. The app was built with Xcode 26.6.
 
 ```bash
 brew install xcodegen
@@ -71,10 +71,10 @@ Edit `Config/Local.xcconfig` and set `DEVELOPMENT_TEAM` to your Apple team ID an
 
 ```bash
 xcodegen generate
-open SSHTerm.xcodeproj
+open Kessik.xcodeproj
 ```
 
-Pick a simulator or a connected iPhone in Xcode and run the SSHTerm scheme. Builds from the command line with `xcodebuild` need the flags `-skipPackagePluginValidation` and `-skipMacroValidation`, because SwiftTerm's build plugin fails validation without them.
+Pick a simulator or a connected iPhone in Xcode and run the Kessik scheme. Builds from the command line with `xcodebuild` need the flags `-skipPackagePluginValidation` and `-skipMacroValidation`, because SwiftTerm's build plugin fails validation without them.
 
 ## Dependencies
 
@@ -90,9 +90,9 @@ Citadel is pinned to 0.12.0 because version 0.12.1 moved NIOSSH to a third-party
 
 ## Project layout
 
-`SSHTerm/SSH` holds the connection code: the SSH session, the tmux commands and their parsers, the Keychain wrappers, the host key store, the Bonjour search and the network monitor. `SSHTerm/Features` holds one folder per screen area: Hosts, Sessions, Terminal, Settings and Guides. `SSHTerm/Components` holds shared views, and `SSHTerm/Theme` holds colors and fonts. The guide text lives in `SSHTerm/Features/Guides/Guides.swift` and must match the labels and error messages the app shows.
+`Kessik/SSH` holds the connection code: the SSH session, the tmux commands and their parsers, the Keychain wrappers, the host key store, the Bonjour search and the network monitor. `Kessik/Features` holds one folder per screen area: Hosts, Sessions, Terminal, Settings and Guides. `Kessik/Components` holds shared views, and `Kessik/Theme` holds colors and fonts. The guide text lives in `Kessik/Features/Guides/Guides.swift` and must match the labels and error messages the app shows.
 
-The two Lottie files in `SSHTerm/Resources/Animations` are generated. Edit `Tools/make_animations.py` and run `python3 Tools/make_animations.py` to rewrite them. Do not edit the JSON by hand.
+The two Lottie files in `Kessik/Resources/Animations` are generated. Edit `Tools/make_animations.py` and run `python3 Tools/make_animations.py` to rewrite them. Do not edit the JSON by hand.
 
 ## Notes
 

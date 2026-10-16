@@ -1,4 +1,4 @@
-"""Writes the app's Lottie animations to SSHTerm/Resources/Animations.
+"""Writes the app's Lottie animations to Kessik/Resources/Animations.
 
 The shapes are drawn here in code, so a change to timing or color is an edit and a rerun:
 
@@ -15,7 +15,7 @@ CORAL = [1.0, 0.38, 0.36, 1]
 WHITE = [1, 1, 1, 1]
 FPS = 60
 
-OUT = os.path.join(os.path.dirname(__file__), "..", "SSHTerm", "Resources", "Animations")
+OUT = os.path.join(os.path.dirname(__file__), "..", "Kessik", "Resources", "Animations")
 
 
 # MARK: Lottie building blocks

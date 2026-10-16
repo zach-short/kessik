@@ -4,15 +4,13 @@
 #
 #   kessik                   the menu
 #   kessik phone             build Debug and run it on the connected iPhone
-#   kessik gen               regenerate SSHTerm.xcodeproj from project.yml
+#   kessik gen               regenerate Kessik.xcodeproj from project.yml
 #   kessik open              open the project in Xcode
 #   kessik log               the tail of the last phone build log
 #   kessik archive           archive Release for App Store Connect (--upload to send it)
 #   kessik shell             print the three lines that go in ~/.zshrc
 #
-# The app is named Kessik. The Xcode target is still SSHTerm, so the scheme and project
-# keep that name. This file only wraps the commands; the build settings live in project.yml
-# and Config/.
+# This file only wraps the commands; the build settings live in project.yml and Config/.
 #
 # It lives in scripts/ rather than in ~/.zshrc so that it is version-controlled next to the
 # project it builds. The shell side stays three lines and never needs editing again.
@@ -27,9 +25,9 @@ if [[ -t 1 ]]; then B=$'\033[1m'; D=$'\033[2m'; O=$'\033[0m'; else B=''; D=''; O
 say()  { printf '%s==>%s %s\n' "$B" "$O" "$*"; }
 die()  { printf 'kessik: %s\n' "$*" >&2; exit 1; }
 
-SCHEME="SSHTerm"
-PROJECT="SSHTerm.xcodeproj"
-APP_NAME="SSHTerm.app"
+SCHEME="Kessik"
+PROJECT="Kessik.xcodeproj"
+APP_NAME="Kessik.app"
 
 # Both IDs are looked up here, not written down. xcodebuild wants the UDID; devicectl wants the
 # CoreDevice identifier. They are different strings for the same phone.
@@ -113,10 +111,10 @@ SNIPPET
 
 menu() {
   cat <<MENU
-${B}kessik${O}  the Kessik app (SSHTerm target)
+${B}kessik${O}  the Kessik app
 
   phone     build Debug and run it on the connected iPhone
-  gen       regenerate SSHTerm.xcodeproj from project.yml
+  gen       regenerate Kessik.xcodeproj from project.yml
   open      open the project in Xcode
   log       the tail of the last phone build log
   archive   archive Release for App Store Connect (--upload to send it)

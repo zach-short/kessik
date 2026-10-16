@@ -37,7 +37,7 @@ xcodegen generate --spec project.yml --project .
 echo "==> Archiving  (version $(grep -m1 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '\"'), build $BUILD)"
 # -skipPackagePluginValidation is required. Without it SwiftTerm's build plugin fails with
 # "Validate plug-in" and no other error (same as kessik phone).
-xcodebuild -project SSHTerm.xcodeproj -scheme SSHTerm -configuration Release \
+xcodebuild -project Kessik.xcodeproj -scheme Kessik -configuration Release \
   -destination 'generic/platform=iOS' -allowProvisioningUpdates \
   -skipPackagePluginValidation -skipMacroValidation \
   -derivedDataPath build \
@@ -46,7 +46,7 @@ xcodebuild -project SSHTerm.xcodeproj -scheme SSHTerm -configuration Release \
   archive
 
 echo "==> Checking the archive"
-APP_DIR="$ARCHIVE/Products/Applications/SSHTerm.app"
+APP_DIR="$ARCHIVE/Products/Applications/Kessik.app"
 [[ -d "$APP_DIR" ]] || { echo "REFUSING TO SHIP: no app at $APP_DIR" >&2; exit 1; }
 
 BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_DIR/Info.plist")"
@@ -60,7 +60,7 @@ echo "    bundle ID $BUNDLE_ID"
 # App Store Connect rejects an upload whose app uses a required-reason API with no manifest.
 if [[ ! -f "$APP_DIR/PrivacyInfo.xcprivacy" ]]; then
     echo "REFUSING TO SHIP: PrivacyInfo.xcprivacy is not in the app bundle." >&2
-    echo "It lives at SSHTerm/PrivacyInfo.xcprivacy; check that xcodegen copied it as a resource." >&2
+    echo "It lives at Kessik/PrivacyInfo.xcprivacy; check that xcodegen copied it as a resource." >&2
     exit 1
 fi
 echo "    privacy manifest present"

@@ -1,4 +1,4 @@
-name: SSHTerm
+name: Kessik
 options:
   bundleIdPrefix: com.example
   deploymentTarget:
@@ -27,10 +27,10 @@ packages:
     url: https://github.com/airbnb/lottie-spm
     exactVersion: 4.6.1
 targets:
-  SSHTerm:
+  Kessik:
     type: application
     platform: iOS
-    sources: [SSHTerm]
+    sources: [Kessik]
     dependencies:
       - package: SwiftTerm
       - package: Citadel
@@ -58,23 +58,23 @@ targets:
         SWIFT_VERSION: "5.0"
         CODE_SIGN_STYLE: Automatic
         ENABLE_PREVIEWS: YES
-  SSHTermTests:
+  KessikTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [SSHTermTests]
+    sources: [KessikTests]
     dependencies:
-      - target: SSHTerm
+      - target: Kessik
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: $(SSHTERM_BUNDLE_ID).tests
         SWIFT_VERSION: "5.0"
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/SSHTerm.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SSHTerm
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Kessik.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kessik
         BUNDLE_LOADER: $(TEST_HOST)
 schemes:
-  SSHTerm:
+  Kessik:
     build:
       targets:
-        SSHTerm: all
+        Kessik: all
     test:
-      targets: [SSHTermTests]
+      targets: [KessikTests]

@@ -1,7 +1,7 @@
 import XCTest
 import SwiftTerm
 import UIKit
-@testable import SSHTerm
+@testable import Kessik
 
 final class TerminalPaletteTests: XCTestCase {
     private var allColorSets: [(String, TerminalPalette.Colors)] {

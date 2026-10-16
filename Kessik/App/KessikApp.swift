@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SSHTermApp: App {
+struct KessikApp: App {
     @State private var store: AppStore
     @State private var link: MacLink
     @State private var showSplash = true

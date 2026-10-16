@@ -1,5 +1,5 @@
 import XCTest
-@testable import SSHTerm
+@testable import Kessik
 
 final class HostTests: XCTestCase {
     func testUnsetHostRoundTripsThroughJSON() throws {
