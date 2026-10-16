@@ -5,7 +5,9 @@ import SwiftUI
 /// still starts when Remote Control fails to connect, so the sheet does not say that it is on.
 struct RemoteControlCard: View {
     var name: String
-    var onDismiss: () -> Void
+    /// Called when the user picks the Claude app. The caller holds the pick until the terminal is ready.
+    var onOpen: () -> Void
+    var onStay: () -> Void
 
     private static let codeURL = URL(string: "https://claude.ai/code")!
 
@@ -13,23 +15,22 @@ struct RemoteControlCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("Control it from your phone", systemImage: "antenna.radiowaves.left.and.right")
                 .font(.headline)
-                .foregroundStyle(Theme.textPrimary)
             Text("Open the Claude app to control \(Text(name).font(Theme.mono).bold()) from this phone. No app? Claude opens claude.ai/code in the browser.")
                 .font(.subheadline)
-                .foregroundStyle(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button(action: openClaude) {
+            Button(action: onOpen) {
                 Label("Open Claude", systemImage: "arrow.up.forward.app").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.bordered)
             .controlSize(.large)
-            Button("Stay in the terminal", action: onDismiss)
+            Button("Stay in the terminal", action: onStay)
                 .frame(maxWidth: .infinity)
             Text("If Claude Code asks to confirm Remote Control or shows an error, answer it in the terminal. Remote Control needs a claude.ai login, not an API key.")
                 .font(.caption)
-                .foregroundStyle(Theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .foregroundStyle(Theme.textPrimary)
+        .tint(Theme.textPrimary)
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .presentationDetents([.medium])
@@ -39,17 +40,16 @@ struct RemoteControlCard: View {
 
     /// A universal link opens the Claude app when it is installed. Without the app the same address
     /// opens claude.ai/code in the browser.
-    private func openClaude() {
-        let url = Self.codeURL
+    static func openClaude() {
+        let url = codeURL
         Task {
             let opened = await UIApplication.shared.open(url, options: [.universalLinksOnly: true])
             if !opened { _ = await UIApplication.shared.open(url) }
         }
-        onDismiss()
     }
 }
 
 #Preview {
-    RemoteControlCard(name: "sshterm") {}
+    RemoteControlCard(name: "sshterm", onOpen: {}, onStay: {})
         .preferredColorScheme(.dark)
 }

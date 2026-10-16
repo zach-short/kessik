@@ -1,4 +1,7 @@
 import SwiftUI
+import PhotosUI
+import SafariServices
+import SwiftTerm
 
 /// Full-screen terminal for one host: password prompt, live shell, and clear error states.
 struct TerminalScreen: View {
@@ -15,7 +18,20 @@ struct TerminalScreen: View {
     @State private var typingReply = false
     /// A new Claude session starts with Remote Control on. This card points to the Claude app.
     @State private var showRemoteControl: Bool
+    /// The user picked the Claude app before the terminal was ready. The pick runs once it connects.
+    @State private var openClaudeWhenReady = false
     @FocusState private var passwordFocused: Bool
+    @AppStorage(SettingsKey.previewPort) private var previewPort = 3000
+    @State private var composing = false
+    @State private var pickingImage = false
+    @State private var pickedImage: PhotosPickerItem?
+    @State private var askingPort = false
+    @State private var portText = ""
+    @State private var forward: PortForward?
+    @State private var showPreview = false
+    /// Shown in place of the state label while an upload or a forward starts.
+    @State private var busy: String?
+    @State private var toolError: String?
     private let title: String?
     private let tmuxName: String?
 
@@ -52,7 +68,7 @@ struct TerminalScreen: View {
             }
             ZStack {
                 Theme.background
-                TerminalHostView(session: session, fontSize: fontSize, watch: watch)
+                TerminalHostView(session: session, fontSize: fontSize, watch: watch) { composing = true }
                     .opacity(terminalOpacity)
                 overlay
                 if watch.inHistory, session.state == .connected {
@@ -69,7 +85,10 @@ struct TerminalScreen: View {
                 session.connect(password: nil)
             }
         }
-        .onDisappear { session.disconnect() }
+        .onDisappear {
+            forward?.stop()
+            session.disconnect()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { session.checkAlive() }
         }
@@ -83,18 +102,58 @@ struct TerminalScreen: View {
         .onChange(of: session.state) { _, state in
             // tmux detached or exited: go back to the session list.
             if state == .disconnected, !session.ownsClient { dismiss() }
+            if state == .connected, openClaudeWhenReady {
+                openClaudeWhenReady = false
+                RemoteControlCard.openClaude()
+            }
+        }
+        .sheet(isPresented: $composing, onDismiss: refocusTerminal) {
+            ComposeSheet { text, send in paste(text, send: send) }
+        }
+        .photosPicker(isPresented: $pickingImage, selection: $pickedImage, matching: .images)
+        .onChange(of: pickedImage) { _, item in
+            if let item { upload(item) }
+            pickedImage = nil
+        }
+        .alert("Preview a port", isPresented: $askingPort) {
+            TextField("Port", text: $portText)
+                .keyboardType(.numberPad)
+            Button("Open") { startPreview() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Opens a server that runs on the Mac, such as a dev server, in a browser on this phone.")
+        }
+        .alert("Could not finish", isPresented: Binding(get: { toolError != nil }, set: { if !$0 { toolError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(toolError ?? "")
+        }
+        .sheet(isPresented: $showPreview, onDismiss: refocusTerminal) {
+            if let forward {
+                SafariView(url: forward.url).ignoresSafeArea()
+            }
         }
         .sheet(isPresented: remoteControlSheet) {
             if let title {
-                RemoteControlCard(name: title) { showRemoteControl = false }
+                RemoteControlCard(name: title) {
+                    // Hold the pick until the terminal is ready, or run it now if it already is.
+                    showRemoteControl = false
+                    if session.state == .connected {
+                        RemoteControlCard.openClaude()
+                    } else {
+                        openClaudeWhenReady = true
+                    }
+                } onStay: {
+                    showRemoteControl = false
+                }
             }
         }
     }
 
-    /// The Remote Control sheet opens once the shell connects, and closes after the user picks.
+    /// The Remote Control sheet opens as soon as the terminal opens, and closes after the user picks.
     private var remoteControlSheet: Binding<Bool> {
         Binding(
-            get: { showRemoteControl && session.state == .connected && title != nil },
+            get: { showRemoteControl && title != nil },
             set: { showRemoteControl = $0 }
         )
     }
@@ -127,12 +186,100 @@ struct TerminalScreen: View {
                     .lineLimit(1)
             }
             Spacer()
-            Text(stateLabel)
+            Text(busy ?? stateLabel)
                 .font(.caption)
                 .foregroundStyle(Theme.textTertiary)
+            toolsMenu
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    // MARK: Tools
+
+    private var toolsMenu: some View {
+        Menu {
+            Button("Write a prompt", systemImage: "square.and.pencil") { composing = true }
+            Button("Send an image", systemImage: "photo") { pickingImage = true }
+            Button("Preview a port", systemImage: "safari") {
+                portText = String(previewPort)
+                askingPort = true
+            }
+            if let forward {
+                Button("Stop port \(forward.remotePort)", systemImage: "xmark.circle") {
+                    forward.stop()
+                    self.forward = nil
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 32, height: 32)
+                .background(Theme.surfaceRaised, in: Circle())
+        }
+        .accessibilityLabel("Tools")
+        .disabled(session.state != .connected || busy != nil)
+    }
+
+    /// The text goes in as one paste. Return, when asked for, follows after a pause, as for replies.
+    private func paste(_ text: String, send: Bool) {
+        watch.leaveHistory()
+        let bracketed = watch.terminal?.getTerminal().bracketedPasteMode ?? false
+        session.send(PasteText.bytes(text, bracketed: bracketed))
+        guard send else { return }
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            session.send("\r")
+        }
+    }
+
+    /// Puts the image on the Mac and types its path, so it can go into the prompt.
+    private func upload(_ item: PhotosPickerItem) {
+        guard let client = session.sshClient else { return }
+        busy = "Uploading…"
+        Task {
+            defer { busy = nil }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else { throw ImageUpload.Unreadable() }
+                let path = try await ImageUpload.upload(data, client: client)
+                watch.leaveHistory()
+                session.send(path + " ")
+                refocusTerminal()
+            } catch {
+                toolError = (error as? LocalizedError)?.errorDescription ?? "The upload failed: \(error)"
+            }
+        }
+    }
+
+    private func startPreview() {
+        guard let port = Int(portText.trimmingCharacters(in: .whitespaces)), (1...65535).contains(port) else {
+            toolError = "Type a port number from 1 to 65535."
+            return
+        }
+        guard let client = session.sshClient else { return }
+        previewPort = port
+        // One forward at a time: the same port opens the browser again on the open forward.
+        if let forward, forward.remotePort == port {
+            showPreview = true
+            return
+        }
+        forward?.stop()
+        forward = nil
+        busy = "Opening port \(port)…"
+        Task {
+            defer { busy = nil }
+            do {
+                forward = try await PortForward.start(client: client, remotePort: port)
+                showPreview = true
+            } catch {
+                toolError = (error as? LocalizedError)?.errorDescription ?? "The port could not open: \(error)"
+            }
+        }
+    }
+
+    private func refocusTerminal() {
+        DispatchQueue.main.async { _ = watch.terminal?.becomeFirstResponder() }
     }
 
     // MARK: Replies
@@ -321,4 +468,15 @@ struct PasswordSaveToggle: View {
             }
         }
     }
+}
+
+/// Safari inside the app. The app stays in the foreground, so iOS keeps the port forward open.
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }
