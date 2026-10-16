@@ -184,9 +184,15 @@ struct TerminalScreen: View {
         case .needsPassword:
             passwordCard
         case .connecting:
-            ProgressView()
-                .controlSize(.large)
-                .tint(Theme.textSecondary)
+            VStack(spacing: 6) {
+                ConnectingAnimation()
+                Text("Connecting to \(session.host.address)…")
+                    .font(Theme.mono)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(.horizontal, 24)
         case .failed(let message):
             messageCard(icon: "exclamationmark.triangle", title: "Could not connect", message: message,
                         retry: "Try again")

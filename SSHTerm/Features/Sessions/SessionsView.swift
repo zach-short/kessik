@@ -104,12 +104,8 @@ struct SessionsView: View {
         } else if let loadError {
             NoticeCard(icon: "exclamationmark.triangle", text: loadError)
         } else if store.sessions.isEmpty, !loading {
-            Text("No sessions. Start one above.")
-                .font(.subheadline)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .card()
+            EmptyState(art: "EmptyTmux", title: "No tmux sessions",
+                       message: "Start a Claude session above. It keeps running on the Mac after you close the app.")
         }
 
         ForEach(store.sessions) { session in
@@ -188,6 +184,13 @@ struct ConnectCard: View {
 
     private var setupPrompt: some View {
         VStack(alignment: .leading, spacing: 14) {
+            Image("EmptyLink")
+                .resizable()
+                .scaledToFit()
+                .frame(maxHeight: 110)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .accessibilityHidden(true)
             Label("No Mac set", systemImage: "laptopcomputer")
                 .font(.headline)
                 .foregroundStyle(Theme.textPrimary)
@@ -211,6 +214,8 @@ struct ConnectCard: View {
 
     @ViewBuilder
     private var loginForm: some View {
+        ConnectingAnimation(active: link.state == .connecting)
+            .frame(maxWidth: .infinity)
         HStack(spacing: 10) {
             StatusDot(status: link.state == .connecting ? .unknown : .unreachable)
             Text(link.host.address)

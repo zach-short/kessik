@@ -22,6 +22,10 @@ packages:
   swift-nio:
     url: https://github.com/apple/swift-nio
     from: 2.81.0
+  # The small repo that points at Lottie's prebuilt XCFramework.
+  Lottie:
+    url: https://github.com/airbnb/lottie-spm
+    exactVersion: 4.6.1
 targets:
   SSHTerm:
     type: application
@@ -36,14 +40,17 @@ targets:
         product: NIOCore
       - package: swift-nio
         product: NIOPosix
+      - package: Lottie
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(SSHTERM_BUNDLE_ID)
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
+        # Holds only the launch screen; Xcode adds the INFOPLIST_KEY_ values below to it.
+        INFOPLIST_FILE: Config/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: SSHTerm
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: SSHTerm connects to computers on your local network over SSH.
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         MARKETING_VERSION: "0.1.0"

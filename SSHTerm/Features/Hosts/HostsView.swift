@@ -20,15 +20,11 @@ struct HostsView: View {
 
                     SectionLabel("Hosts")
                     if store.hosts.isEmpty {
-                        Button { showTab(.settings) } label: {
-                            Label("Add your Mac in Settings", systemImage: "plus.circle")
-                                .font(.subheadline)
-                                .foregroundStyle(Theme.textSecondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(14)
-                                .card()
+                        EmptyState(art: "EmptyLink", title: "No Mac yet",
+                                   message: "Add your Mac's hostname and username in Settings to connect from here.") {
+                            Button("Open Settings") { showTab(.settings) }
+                                .buttonStyle(.borderedProminent)
                         }
-                        .buttonStyle(.plain)
                     }
                     ForEach(store.hosts) { host in
                         Button { activeHost = host } label: { HostCard(host: host) }

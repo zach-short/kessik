@@ -4,6 +4,7 @@ import SwiftUI
 struct SSHTermApp: App {
     @State private var store: AppStore
     @State private var link: MacLink
+    @State private var showSplash = true
 
     init() {
         let store = AppStore()
@@ -13,12 +14,21 @@ struct SSHTermApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(store)
-                .environment(link)
-                .preferredColorScheme(.dark)
-                .tint(Theme.accent)
-                .onChange(of: store.snippets) { _, snippets in SavedSnippets.save(snippets) }
+            ZStack {
+                RootView()
+                if showSplash {
+                    SplashView {
+                        withAnimation(.easeOut(duration: 0.35)) { showSplash = false }
+                    }
+                    .transition(.opacity)
+                    .zIndex(1)
+                }
+            }
+            .environment(store)
+            .environment(link)
+            .preferredColorScheme(.dark)
+            .tint(Theme.accent)
+            .onChange(of: store.snippets) { _, snippets in SavedSnippets.save(snippets) }
         }
     }
 }
