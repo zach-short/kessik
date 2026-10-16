@@ -75,7 +75,9 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
             self?.ctrlButton.isSelected = t.controlModifier
         }
         stack.addArrangedSubview(ctrlButton)
-        stack.addArrangedSubview(key(icon: "arrow.right.to.line") { $0.send([0x09]) })
+        stack.addArrangedSubview(key(icon: "arrow.right.to.line", label: "Tab") { $0.send([0x09]) })
+        // Claude Code cycles its modes (default, accept edits, plan) on Shift+Tab.
+        stack.addArrangedSubview(key(icon: "arrow.left.to.line", label: "Shift Tab") { $0.send(EscapeSequences.cmdBackTab) })
         stack.addArrangedSubview(arrow("arrow.left", app: EscapeSequences.moveLeftApp, normal: EscapeSequences.moveLeftNormal))
         stack.addArrangedSubview(arrow("arrow.up", app: EscapeSequences.moveUpApp, normal: EscapeSequences.moveUpNormal))
         stack.addArrangedSubview(arrow("arrow.down", app: EscapeSequences.moveDownApp, normal: EscapeSequences.moveDownNormal))

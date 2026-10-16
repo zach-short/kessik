@@ -4,6 +4,9 @@ import UIKit
 
 /// SwiftTerm's UIKit view, wired to an `SSHSession`.
 struct TerminalHostView: UIViewRepresentable {
+    /// Text sizes in points that pinch allows. The Settings stepper uses the same range.
+    static let fontSizes: ClosedRange<CGFloat> = 9...24
+
     let session: SSHSession
     var fontSize: Double
 
@@ -19,6 +22,7 @@ struct TerminalHostView: UIViewRepresentable {
         view.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         view.optionAsMetaKey = true
         view.inputAccessoryView = KeyBar(terminal: view)
+        view.addGestureRecognizer(UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinch(_:))))
 
         session.onOutput = { [weak view] bytes in
             view?.feed(byteArray: bytes)
@@ -39,9 +43,28 @@ struct TerminalHostView: UIViewRepresentable {
 
     final class Coordinator: NSObject, TerminalViewDelegate {
         let session: SSHSession
+        private var pinchStartSize: CGFloat = 0
 
         init(session: SSHSession) {
             self.session = session
+        }
+
+        /// Steps the text size in whole points, so the shell gets a resize only when the size
+        /// changes, not on every frame of the pinch. Saves it for Settings and the next terminal.
+        @objc func pinch(_ gesture: UIPinchGestureRecognizer) {
+            guard let view = gesture.view as? TerminalView else { return }
+            switch gesture.state {
+            case .began:
+                pinchStartSize = view.font.pointSize
+            case .changed:
+                let range = TerminalHostView.fontSizes
+                let size = min(max((pinchStartSize * gesture.scale).rounded(), range.lowerBound), range.upperBound)
+                guard size != view.font.pointSize else { return }
+                view.font = UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
+                UserDefaults.standard.set(Double(size), forKey: SettingsKey.terminalFontSize)
+            default:
+                break
+            }
         }
 
         func send(source: TerminalView, data: ArraySlice<UInt8>) {
