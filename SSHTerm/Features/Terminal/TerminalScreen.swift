@@ -9,24 +9,34 @@ struct TerminalScreen: View {
     @AppStorage(SettingsKey.rememberPasswords) private var remember = true
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
     @State private var session: SSHSession
+    @State private var watch: ScreenWatch
     @State private var password = ""
     @State private var replyCount = 0
     @State private var typingReply = false
+    /// A new Claude session starts with Remote Control on. This card points to the Claude app.
+    @State private var showRemoteControl: Bool
     @FocusState private var passwordFocused: Bool
     private let title: String?
     private let tmuxName: String?
 
     init(host: Host) {
-        _session = State(initialValue: SSHSession(host: host))
+        let session = SSHSession(host: host)
+        _session = State(initialValue: session)
+        _watch = State(initialValue: ScreenWatch(session: session))
+        _showRemoteControl = State(initialValue: false)
         title = nil
         tmuxName = nil
     }
 
     /// Opens a shell on the Sessions tab's connection and types `command` into it. A tmux command
     /// closes the terminal when tmux detaches, and after a drop Reconnect attaches to `tmuxName`
-    /// again. `title` goes in the status line.
-    init(link: MacLink, command: String, title: String, tmuxName: String?) {
-        _session = State(initialValue: SSHSession(link: link, startCommand: command, tmuxName: tmuxName))
+    /// again. `title` goes in the status line. `remoteControl` is true when `command` starts a
+    /// Claude Code session with Remote Control on, and shows the card that points to the Claude app.
+    init(link: MacLink, command: String, title: String, tmuxName: String?, remoteControl: Bool = false) {
+        let session = SSHSession(link: link, startCommand: command, tmuxName: tmuxName)
+        _session = State(initialValue: session)
+        _watch = State(initialValue: ScreenWatch(session: session))
+        _showRemoteControl = State(initialValue: remoteControl)
         self.title = title
         self.tmuxName = tmuxName
     }
@@ -34,14 +44,24 @@ struct TerminalScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             statusLine
-            if !store.snippets(.reply).isEmpty {
+            // While Claude Code asks a question, its options take the replies' place.
+            if let menu = watch.menu, session.state == .connected {
+                MenuOptionBar(menu: menu) { watch.choose($0) }
+            } else if !store.snippets(.reply).isEmpty {
                 replyBar
             }
             ZStack {
                 Theme.background
-                TerminalHostView(session: session, fontSize: fontSize)
+                TerminalHostView(session: session, fontSize: fontSize, watch: watch)
                     .opacity(terminalOpacity)
                 overlay
+                if showRemoteControl, session.state == .connected, let title {
+                    RemoteControlCard(name: title) { showRemoteControl = false }
+                }
+                if watch.inHistory, session.state == .connected {
+                    LatestOutputButton { watch.leaveHistory() }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
             }
         }
         .background(Theme.background.ignoresSafeArea())
@@ -137,6 +157,7 @@ struct TerminalScreen: View {
         // A double tap would type the text twice before either Return.
         guard !typingReply else { return }
         typingReply = true
+        watch.leaveHistory()
         session.send(snippet.text)
         replyCount += 1
         // Claude Code can read one burst of text as a paste, where Return adds a new line instead

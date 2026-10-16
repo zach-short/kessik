@@ -23,11 +23,21 @@ enum Tmux {
 
     /// Typed into an interactive shell. `exec` ends the shell when tmux detaches, so the terminal closes too.
     static func attachCommand(_ name: String) -> String {
-        "exec tmux attach -t \(quote("=" + name))"
+        "exec tmux attach -t \(quote("=" + name))" + mouseOn(name)
     }
 
+    /// `--remote-control` starts Claude Code with Remote Control on, named after the session, so the
+    /// Claude app and claude.ai/code list it. tmux only runs `claude` when it creates the session;
+    /// with `-A` on an existing session the flag is ignored and Remote Control stays as it was.
     static func newClaudeCommand(name: String, path: String) -> String {
-        "exec tmux new -A -s \(quote(name)) -c \(quote(path)) claude"
+        "exec tmux new -A -s \(quote(name)) -c \(quote(path)) claude --remote-control \(quote(name))" + mouseOn(name)
+    }
+
+    /// Runs after the attach. With `mouse on`, a swipe on the phone scrolls tmux's history. It is a
+    /// session option, so a Mac terminal on the same session gets it too; other sessions keep theirs.
+    /// The target needs the trailing `:`, or tmux reads `=name` as a pane and finds no session.
+    private static func mouseOn(_ name: String) -> String {
+        #" \; set -t "# + quote("=" + name + ":") + " mouse on"
     }
 
     /// tmux does not allow `.` or `:` in session names. Keep it short and readable.
