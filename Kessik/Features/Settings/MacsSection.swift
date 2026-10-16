@@ -147,6 +147,7 @@ private struct MacForm: View {
     @State private var jumpPasswordSaved = false
     /// Nil is "Same as app".
     @State private var paletteID: String?
+    @State private var startCommand = ""
     /// Read so the colors picker lists newly imported palettes.
     @AppStorage(CustomPalettes.key) private var customPalettes = Data()
     @State private var finding = false
@@ -160,6 +161,12 @@ private struct MacForm: View {
             Button("Find Macs on this Wi-Fi", systemImage: "wifi") { finding = true }
             field("Name", prompt: "Mac", text: $name)
             field("Hostname", prompt: "mac.tailnet.ts.net", text: $hostname, keyboard: .URL)
+                // Not on a single key typed or deleted, or the field would be cut to the host while
+                // the line is still being typed. A paste, even over a longer selection, or Return parses.
+                .onChange(of: hostname) { old, new in
+                    if abs(new.count - old.count) != 1 { paste(SSHLine.parse(new)) }
+                }
+                .onSubmit { paste(SSHLine.parse(hostname)) }
             field("Port", prompt: "22", text: $port, keyboard: .numberPad)
             field("Username", prompt: "whoami on the Mac", text: $username)
             Picker("Terminal colors", selection: $paletteID) {
@@ -168,6 +175,7 @@ private struct MacForm: View {
                     Text(palette.name).tag(Optional(palette.id))
                 }
             }
+            field("Start command", prompt: "claude --remote-control", text: $startCommand)
             JumpHostFields(draft: $jump, hasSavedPassword: jumpPasswordSaved)
             Button("Save") { save() }
                 .disabled(draft == nil || !changed)
@@ -187,6 +195,15 @@ private struct MacForm: View {
         hostname = found
         port = mac.port == 22 ? "" : String(mac.port)
         foundNote = true
+    }
+
+    /// A pasted `ssh user@host` line fills the fields it names, and the hostname keeps only the host.
+    private func paste(_ line: SSHLine?) {
+        guard let line else { return }
+        hostname = line.hostname
+        port = line.port == 22 ? "" : String(line.port)
+        if let user = line.username { username = user }
+        if let hop = line.jump { jump = JumpHostDraft(hop) }
     }
 
     private func field(_ label: String, prompt: String, text: Binding<String>,
@@ -239,6 +256,8 @@ private struct MacForm: View {
         host.username = trimmedUsername
         host.jump = jump.jump
         host.paletteID = existing(paletteID)
+        let command = startCommand.trimmingCharacters(in: .whitespaces)
+        host.startCommand = command.isEmpty ? nil : command
         return host
     }
 
@@ -247,6 +266,7 @@ private struct MacForm: View {
         guard let editing else { return true }
         return !draft.sameLogin(as: editing) || draft.name != editing.name || draft.jump != editing.jump
             || !jump.password.isEmpty || draft.paletteID != existing(editing.paletteID)
+            || draft.startCommand != editing.customStartCommand
     }
 
     private var footer: String {
@@ -277,6 +297,7 @@ private struct MacForm: View {
         username = host.username
         jump = JumpHostDraft(host.jump)
         paletteID = existing(host.paletteID)
+        startCommand = host.startCommand ?? ""
         jumpPasswordSaved = host.jump.map { SavedPassword.get(for: $0.login) != nil } ?? false
     }
 

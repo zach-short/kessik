@@ -1,5 +1,6 @@
 import XCTest
 import CryptoKit
+import NIOSSH
 @testable import Kessik
 
 /// Fixtures are throwaway keys made with ssh-keygen for these tests only. No Mac trusts them.
@@ -59,15 +60,74 @@ final class KeyImportTests: XCTestCase {
         rRgJnHm0Ag9n6UEIkAAAAKa2Vzc2lrLXJzYQE=
         """)
 
-    /// `ssh-keygen -t ecdsa -N ""`
-    private lazy var ecdsa = wrap("""
-        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
-        1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQRvucbQdqwM2DWtShnDJXuFMoO/G2n+
-        /sOGcgrjXvVD1Rq0xlJh8hO2ZPcdsEDbd1/YM95xLr2jV8AXHs0+4rrXAAAAoH1tQMl9bU
-        DJAAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBG+5xtB2rAzYNa1K
-        GcMle4Uyg78baf7+w4ZyCuNe9UPVGrTGUmHyE7Zk9x2wQNt3X9gz3nEuvaNXwBcezT7iut
-        cAAAAgcU9hBjPNxkdCOyb3gDJkuQB6hO6PgRhRrVkn5K8a9k4AAAABeAECAwQFBgc=
-        """)
+    /// An ECDSA fixture with its `ssh-keygen -y` line and `ssh-keygen -l` fingerprint.
+    private struct ECDSAFixture {
+        var text: String
+        var pub: String
+        var fingerprint: String
+        var label: String
+    }
+
+    /// `ssh-keygen -t ecdsa -b 256|384|521 -N "" -C kessik-test-p<bits>`
+    private lazy var ecdsaKeys = [
+        ECDSAFixture(text: wrap("""
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
+            1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQQJ3Jm17OL9mWdBxqv2EIASWGitX0w7
+            ATFGDraRl4TgK9c+xw1v1yYAhO1vWAeUn36gMDmj7yyUBEkLgleSZELVAAAAsPZ2rrH2dq
+            6xAAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAncmbXs4v2ZZ0HG
+            q/YQgBJYaK1fTDsBMUYOtpGXhOAr1z7HDW/XJgCE7W9YB5SffqAwOaPvLJQESQuCV5JkQt
+            UAAAAhAI+KzkWUwTZ+SchCEX99t6jyZ5h61jmIWu9smn0CF4AqAAAAEGtlc3Npay10ZXN0
+            LXAyNTYBAgMEBQYH
+            """),
+            pub: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAncmbXs4v2ZZ0HGq/YQgBJYaK1fTDsBMUYOtpGXhOAr1z7HDW/XJgCE7W9YB5SffqAwOaPvLJQESQuCV5JkQtU= kessik-test-p256",
+            fingerprint: "SHA256:8F3t5VKat5wbxcPkkm9NJBWb8wsAYiEWPt5jTLRtv/c",
+            label: "ECDSA P-256"),
+        ECDSAFixture(text: wrap("""
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAiAAAABNlY2RzYS
+            1zaGEyLW5pc3RwMzg0AAAACG5pc3RwMzg0AAAAYQTGBVQzYWFd20knOMaj/2YV5LkLDaic
+            sC6dsvMRHeZlm4KfbJ1RociLKkl3EgOB1kppAbsGWCxfPtfAzKO9+9Snl6m+jEAv1tYTpV
+            7541Y4izSZGQJxlfpcDe1U8OyLIywAAADYZaKL3WWii90AAAATZWNkc2Etc2hhMi1uaXN0
+            cDM4NAAAAAhuaXN0cDM4NAAAAGEExgVUM2FhXdtJJzjGo/9mFeS5Cw2onLAunbLzER3mZZ
+            uCn2ydUaHIiypJdxIDgdZKaQG7BlgsXz7XwMyjvfvUp5epvoxAL9bWE6Ve+eNWOIs0mRkC
+            cZX6XA3tVPDsiyMsAAAAMCyfAzBvplxPgtimBFhtewgWnTBFqzD186BxYtLb5wmSOJ2kjU
+            e+hCLFsszq4yGofAAAABBrZXNzaWstdGVzdC1wMzg0
+            """),
+            pub: "ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzODQAAABhBMYFVDNhYV3bSSc4xqP/ZhXkuQsNqJywLp2y8xEd5mWbgp9snVGhyIsqSXcSA4HWSmkBuwZYLF8+18DMo7371KeXqb6MQC/W1hOlXvnjVjiLNJkZAnGV+lwN7VTw7IsjLA== kessik-test-p384",
+            fingerprint: "SHA256:4r5cIFAZiTwbHa7YIFma3BNlJVNFGhNFB3K+iJ5dpgw",
+            label: "ECDSA P-384"),
+        ECDSAFixture(text: wrap("""
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAArAAAABNlY2RzYS
+            1zaGEyLW5pc3RwNTIxAAAACG5pc3RwNTIxAAAAhQQB7Z75mnjaCYolwj2XJkWfrxheTsZv
+            wz5d8Z0KadwokjCaLWn+w7d/+fjQ3OdWwwGRuwRQIGeUdo5sD7SaSSD1H8kAKYNf3M8SOV
+            FwdCHQXAT6LFGp9j731jDaxymzo7OhqpuyNNsEFzNA4/R7B/ezG816aszQpkvUz7GpuB7g
+            5pQFhNcAAAEQwDo1WsA6NVoAAAATZWNkc2Etc2hhMi1uaXN0cDUyMQAAAAhuaXN0cDUyMQ
+            AAAIUEAe2e+Zp42gmKJcI9lyZFn68YXk7Gb8M+XfGdCmncKJIwmi1p/sO3f/n40NznVsMB
+            kbsEUCBnlHaObA+0mkkg9R/JACmDX9zPEjlRcHQh0FwE+ixRqfY+99Yw2scps6Ozoaqbsj
+            TbBBczQOP0ewf3sxvNemrM0KZL1M+xqbge4OaUBYTXAAAAQgDqjJ4WX7DT1z2y3AYmrPwC
+            u+9FqtRmAX+sMCkCJOjZ1bErzEa4EHr1vX1r10Sk1v/Njivh+2fV2DqhJlLOj1V6pwAAAB
+            BrZXNzaWstdGVzdC1wNTIxAQI=
+            """),
+            pub: "ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAHtnvmaeNoJiiXCPZcmRZ+vGF5Oxm/DPl3xnQpp3CiSMJotaf7Dt3/5+NDc51bDAZG7BFAgZ5R2jmwPtJpJIPUfyQApg1/czxI5UXB0IdBcBPosUan2PvfWMNrHKbOjs6Gqm7I02wQXM0Dj9HsH97MbzXpqzNCmS9TPsam4HuDmlAWE1w== kessik-test-p521",
+            fingerprint: "SHA256:syWlgI33ixuf1QQQV0I2e9ncMLlDmNAzAsoy71ugOE0",
+            label: "ECDSA P-521"),
+    ]
+
+    /// `ssh-keygen -t ecdsa -b 521 -N test-pass -C kessik-test-enc` (aes256-ctr with bcrypt, the default).
+    private lazy var encryptedECDSA = ECDSAFixture(text: wrap("""
+        b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABBhElUmDp
+        48pdzL2wRqiCM3AAAAGAAAAAEAAACsAAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlz
+        dHA1MjEAAACFBADaNSDNeCVJBtoRMznGBvE18wEC+DhRcW+rymVAIFF0MMSKyl/7P/2wIn
+        8PdPclIsArH1pfINMzVvtyMgLQvRriXwGsCQQ0Q//oYC9nbKCIEyeVQjuHim7nL7CUkUCs
+        MDhKnWVdzSCiLUHRYCaPkm7n+wc6KWDaCfWNNVQ02ofPpJuaaAAAARCTQ/2mGW7wgGM87n
+        oJLRWzYIcbpdHO1R0ZyO9ZBuf7Otm1e0bq66ShrATvDfaqX/jVu9eCLSv04H4XTfPEs18k
+        CUp3R6M09GlCsHp/3E1xv1ELraQ8yUTlADzbHRAIrb0oQct0jM1C//zDqCNA5/GR/IGAuT
+        OkY0hBrNR5FsMIbWNYM+iJRBRLY7tJTiM6fwP6GQSFmbd4lqb+4xHYTLmbl+YbGgw8ipfJ
+        z8kcnleISzN5QapwjNghVPir3Z1w06sxzFTW0BvH3RSC2FKK/BhVoT7OBODhLxl8dwGdCx
+        6kAxDpnnwhbE8Zc2+yD0qySWzrWjaQakYP6xww6aQzW/t5NxircZAOe6L5fH8nvDtFDQ==
+        """),
+        pub: "ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBADaNSDNeCVJBtoRMznGBvE18wEC+DhRcW+rymVAIFF0MMSKyl/7P/2wIn8PdPclIsArH1pfINMzVvtyMgLQvRriXwGsCQQ0Q//oYC9nbKCIEyeVQjuHim7nL7CUkUCsMDhKnWVdzSCiLUHRYCaPkm7n+wc6KWDaCfWNNVQ02ofPpJuaaA== kessik-test-enc",
+        fingerprint: "SHA256:nqJd6LKT6kvsCJQ17oXS8rAaMVBfDLhyjIYKdTTR8Bg",
+        label: "ECDSA P-521")
 
     /// Key type and base64 of an `authorized_keys` line, without the comment.
     private func keyPart(_ line: String) -> String {
@@ -123,8 +183,53 @@ final class KeyImportTests: XCTestCase {
         assertFails("-----BEGIN RSA PRIVATE KEY-----\nMIIB\n-----END RSA PRIVATE KEY-----", with: .unsupportedType("RSA"))
     }
 
-    func testRejectsECDSA() {
-        assertFails(ecdsa, with: .unsupportedType("ECDSA"))
+    func testRSAErrorSaysWhichKeysWork() {
+        let message = KeyImport.Failure.unsupportedType("RSA").localizedDescription
+        XCTAssertTrue(message.contains("cannot use RSA keys"))
+        XCTAssertTrue(message.contains("ed25519 and ECDSA"))
+    }
+
+    func testECDSAKeysMatchSSHKeygen() throws {
+        for fixture in ecdsaKeys {
+            let key = try KeyImport.parse(fixture.text)
+            XCTAssertEqual(keyPart(DeviceKey.publicLine(for: key)), keyPart(fixture.pub), fixture.label)
+            XCTAssertEqual(KeyImport.fingerprint(for: key), fixture.fingerprint, fixture.label)
+            XCTAssertEqual(KeyImport.fingerprint(ofLine: DeviceKey.publicLine(for: key)), fixture.fingerprint, fixture.label)
+            XCTAssertEqual(key.label, fixture.label)
+        }
+    }
+
+    /// A login signs with `sshKey`, and the Mac checks the signature with the line in authorized_keys.
+    func testECDSASignatureVerifiesWithPublicLine() throws {
+        for fixture in ecdsaKeys + [encryptedECDSA] {
+            let key = try KeyImport.parse(fixture.text, passphrase: "test-pass")
+            let publicKey = try NIOSSHPublicKey(openSSHPublicKey: fixture.pub)
+            let signature = try key.sshKey.sign(digest: SHA256.hash(data: Data("session".utf8)))
+            XCTAssertTrue(publicKey.isValidSignature(signature, for: SHA256.hash(data: Data("session".utf8))), fixture.label)
+            XCTAssertFalse(publicKey.isValidSignature(signature, for: SHA256.hash(data: Data("other".utf8))), fixture.label)
+        }
+    }
+
+    /// The Keychain holds an ECDSA key as its raw scalar, and the length picks the curve on load.
+    func testECDSARawRepresentationRoundTrips() throws {
+        for fixture in ecdsaKeys {
+            let key = try KeyImport.parse(fixture.text)
+            let loaded = try XCTUnwrap(DeviceKey.Key(ecdsaRaw: key.rawRepresentation))
+            XCTAssertEqual(DeviceKey.publicLine(for: loaded), DeviceKey.publicLine(for: key), fixture.label)
+        }
+        XCTAssertNil(DeviceKey.Key(ecdsaRaw: Data(count: 40)))
+    }
+
+    func testEncryptedECDSAKey() throws {
+        assertFails(encryptedECDSA.text, with: .passphraseNeeded)
+        assertFails(encryptedECDSA.text, passphrase: "nope", with: .wrongPassphrase)
+        let key = try KeyImport.parse(encryptedECDSA.text, passphrase: "test-pass")
+        XCTAssertEqual(keyPart(DeviceKey.publicLine(for: key)), keyPart(encryptedECDSA.pub))
+        XCTAssertEqual(KeyImport.fingerprint(for: key), encryptedECDSA.fingerprint)
+    }
+
+    func testRejectsPEMECDSA() {
+        assertFails("-----BEGIN EC PRIVATE KEY-----\nMHcC\n-----END EC PRIVATE KEY-----", with: .otherFormat("PEM"))
     }
 
     func testRejectsPKCS8() {

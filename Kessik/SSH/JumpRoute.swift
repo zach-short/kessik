@@ -17,7 +17,7 @@ struct LoginHop {
     let validator: TOFUHostKeyValidator
 
     /// The key first, then `password`, with this hop's own host key check.
-    func settings(key: Curve25519.Signing.PrivateKey?, password: String?,
+    func settings(key: DeviceKey.Key?, password: String?,
                   enclaveKey: SecureEnclave.P256.Signing.PrivateKey? = nil) -> SSHClientSettings {
         let username = target.username
         var settings = SSHClientSettings(

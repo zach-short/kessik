@@ -10,14 +10,14 @@ final class LoginMethods: NIOSSHClientUserAuthenticationDelegate {
     private let username: String
     private var offers: [NIOSSHUserAuthenticationOffer.Offer] = []
 
-    init(username: String, key: Curve25519.Signing.PrivateKey?, password: String?,
+    init(username: String, key: DeviceKey.Key?, password: String?,
          enclaveKey: SecureEnclave.P256.Signing.PrivateKey? = nil) {
         self.username = username
         if let enclaveKey {
             offers.append(.privateKey(.init(privateKey: NIOSSHPrivateKey(secureEnclaveP256Key: enclaveKey))))
         }
         if let key {
-            offers.append(.privateKey(.init(privateKey: NIOSSHPrivateKey(ed25519Key: key))))
+            offers.append(.privateKey(.init(privateKey: key.sshKey)))
         }
         if let password, !password.isEmpty {
             offers.append(.password(.init(password: password)))

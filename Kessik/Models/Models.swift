@@ -20,6 +20,9 @@ struct Host: Identifiable, Codable, Hashable {
     /// Terminal colors for this Mac, by palette id. Nil uses the palette from Settings. Older
     /// builds saved no such key, and a missing key decodes as nil.
     var paletteID: String?
+    /// Run in place of `claude --remote-control` when New session starts tmux, such as `codex`.
+    /// Nil or blank keeps the default. Older builds saved no such key, and a missing key decodes as nil.
+    var startCommand: String?
 
     var address: String { port == 22 ? "\(username)@\(hostname)" : "\(username)@\(hostname):\(port)" }
 
@@ -27,6 +30,12 @@ struct Host: Identifiable, Codable, Hashable {
     static let unset = Host(name: "Mac", hostname: "", username: "")
 
     var isSet: Bool { !hostname.isEmpty && !username.isEmpty }
+
+    /// The start command when one is set, trimmed. Nil runs Claude Code with Remote Control.
+    var customStartCommand: String? {
+        let command = startCommand?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return command.isEmpty ? nil : command
+    }
 
     /// Same login target: the Keychain password and host key belong to it.
     func sameLogin(as other: Host) -> Bool {

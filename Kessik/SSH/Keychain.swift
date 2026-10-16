@@ -95,31 +95,92 @@ enum SavedPassword {
     }
 }
 
-/// This phone's ed25519 login key. The private half stays in the Keychain;
-/// the public half goes into `~/.ssh/authorized_keys` on the Mac.
+/// This phone's login key in the Keychain: a generated ed25519 key, or an imported ed25519 or ECDSA key.
+/// The private half stays in the Keychain; the public half goes into `~/.ssh/authorized_keys` on the Mac.
 enum DeviceKey {
-    private static let keychain = Keychain(service: "SSHTerm.key")
-    private static let account = "ed25519"
-    static let comment = "sshterm@iphone"
+    /// A private key the Keychain can hold.
+    enum Key {
+        case ed25519(Curve25519.Signing.PrivateKey)
+        case p256(P256.Signing.PrivateKey)
+        case p384(P384.Signing.PrivateKey)
+        case p521(P521.Signing.PrivateKey)
 
-    static func load() -> Curve25519.Signing.PrivateKey? {
-        keychain.data(for: account).flatMap { try? Curve25519.Signing.PrivateKey(rawRepresentation: $0) }
+        /// An ECDSA key from its private scalar. The length picks the curve: 32, 48 or 66 bytes.
+        init?(ecdsaRaw raw: Data) {
+            switch raw.count {
+            case 32: guard let key = try? P256.Signing.PrivateKey(rawRepresentation: raw) else { return nil }; self = .p256(key)
+            case 48: guard let key = try? P384.Signing.PrivateKey(rawRepresentation: raw) else { return nil }; self = .p384(key)
+            case 66: guard let key = try? P521.Signing.PrivateKey(rawRepresentation: raw) else { return nil }; self = .p521(key)
+            default: return nil
+            }
+        }
+
+        var rawRepresentation: Data {
+            switch self {
+            case .ed25519(let key): return key.rawRepresentation
+            case .p256(let key): return key.rawRepresentation
+            case .p384(let key): return key.rawRepresentation
+            case .p521(let key): return key.rawRepresentation
+            }
+        }
+
+        var sshKey: NIOSSHPrivateKey {
+            switch self {
+            case .ed25519(let key): return NIOSSHPrivateKey(ed25519Key: key)
+            case .p256(let key): return NIOSSHPrivateKey(p256Key: key)
+            case .p384(let key): return NIOSSHPrivateKey(p384Key: key)
+            case .p521(let key): return NIOSSHPrivateKey(p521Key: key)
+            }
+        }
+
+        /// The key type as Settings shows it.
+        var label: String {
+            switch self {
+            case .ed25519: return "Ed25519"
+            case .p256: return "ECDSA P-256"
+            case .p384: return "ECDSA P-384"
+            case .p521: return "ECDSA P-521"
+            }
+        }
     }
 
+    private static let keychain = Keychain(service: "SSHTerm.key")
+    /// One item at a time: an ed25519 key under `account`, or an ECDSA key under `ecdsaAccount`.
+    private static let account = "ed25519"
+    private static let ecdsaAccount = "ecdsa"
+    static let comment = "sshterm@iphone"
+
+    static func load() -> Key? {
+        if let data = keychain.data(for: account), let key = try? Curve25519.Signing.PrivateKey(rawRepresentation: data) {
+            return .ed25519(key)
+        }
+        return keychain.data(for: ecdsaAccount).flatMap(Key.init(ecdsaRaw:))
+    }
+
+    /// The type of the saved key, or "Ed25519", the type a new key gets.
+    static var label: String { load()?.label ?? "Ed25519" }
+
     @discardableResult
-    static func generate() throws -> Curve25519.Signing.PrivateKey {
-        let key = Curve25519.Signing.PrivateKey()
-        try keychain.set(key.rawRepresentation, for: account)
+    static func generate() throws -> Key {
+        let key = Key.ed25519(Curve25519.Signing.PrivateKey())
+        try save(key)
         return key
     }
 
-    /// Saves an imported key in place of the current one.
-    static func save(_ key: Curve25519.Signing.PrivateKey) throws {
-        try keychain.set(key.rawRepresentation, for: account)
+    /// Saves `key` in place of the current one.
+    static func save(_ key: Key) throws {
+        if case .ed25519 = key {
+            try keychain.set(key.rawRepresentation, for: account)
+            keychain.delete(ecdsaAccount)
+        } else {
+            try keychain.set(key.rawRepresentation, for: ecdsaAccount)
+            keychain.delete(account)
+        }
     }
 
     static func delete() {
         keychain.delete(account)
+        keychain.delete(ecdsaAccount)
     }
 
     /// Adds `line` to `~/.ssh/authorized_keys` on the Mac unless it is there already.
@@ -131,9 +192,9 @@ enum DeviceKey {
             + "{ grep -qxF \(Tmux.quote(line)) \"\(file)\" || echo \(Tmux.quote(line)) >> \"\(file)\"; }"
     }
 
-    /// One `authorized_keys` line: `ssh-ed25519 AAAA… sshterm@iphone`.
-    static func publicLine(for key: Curve25519.Signing.PrivateKey) -> String {
-        String(openSSHPublicKey: NIOSSHPrivateKey(ed25519Key: key).publicKey) + " " + comment
+    /// One `authorized_keys` line: `ssh-ed25519 AAAA… sshterm@iphone`, or `ecdsa-sha2-nistp384 AAAA…` for ECDSA.
+    static func publicLine(for key: Key) -> String {
+        String(openSSHPublicKey: key.sshKey.publicKey) + " " + comment
     }
 }
 

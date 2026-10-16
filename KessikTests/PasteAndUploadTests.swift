@@ -43,3 +43,40 @@ final class ImageUploadTests: XCTestCase {
         XCTAssertEqual(ImageUpload.fileName(at: date, ext: "png"), "image-20261015-143012.png")
     }
 }
+
+final class FileUploadTests: XCTestCase {
+    func testSafeNameKeepsWordsAndExtension() {
+        XCTAssertEqual(ImageUpload.safeName("My notes.pdf"), "My-notes.pdf")
+        XCTAssertEqual(ImageUpload.safeName("Résumé 日本.txt"), "Résumé-日本.txt")
+        XCTAssertEqual(ImageUpload.safeName("Makefile"), "Makefile")
+        XCTAssertEqual(ImageUpload.safeName("a.tar.gz"), "a.tar.gz")
+    }
+
+    func testSafeNameCannotLeaveTheFolder() {
+        XCTAssertEqual(ImageUpload.safeName("../x"), "x")
+        XCTAssertEqual(ImageUpload.safeName("a/b\u{0}c\nd"), "a-b-c-d")
+        XCTAssertEqual(ImageUpload.safeName(".env"), "env")
+        XCTAssertEqual(ImageUpload.safeName(".."), "file")
+        XCTAssertEqual(ImageUpload.safeName(""), "file")
+    }
+
+    func testLongNameIsShortenedButKeepsTheExtension() {
+        let name = ImageUpload.safeName(String(repeating: "é", count: 300) + ".swift")
+        XCTAssertTrue(name.hasSuffix(".swift"))
+        XCTAssertLessThanOrEqual(name.utf8.count, 120)
+    }
+
+    func testFileNameStartsWithTheTime() {
+        var parts = DateComponents()
+        (parts.year, parts.month, parts.day, parts.hour, parts.minute, parts.second) = (2026, 10, 15, 14, 30, 12)
+        let date = Calendar.current.date(from: parts)!
+        XCTAssertEqual(ImageUpload.fileName(at: date, original: "My notes.pdf"), "20261015-143012-My-notes.pdf")
+    }
+
+    func testFilesOver100MBAreRefused() {
+        XCTAssertNoThrow(try ImageUpload.checkSize(100 * 1024 * 1024))
+        XCTAssertThrowsError(try ImageUpload.checkSize(100 * 1024 * 1024 + 1)) { error in
+            XCTAssertEqual((error as? LocalizedError)?.errorDescription, "The file is larger than 100 MB.")
+        }
+    }
+}

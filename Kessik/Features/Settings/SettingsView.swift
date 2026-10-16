@@ -13,6 +13,9 @@ enum SettingsKey {
     static let previewPort = "previewPort"
     /// Id of the terminal palette. See `TerminalPalette`.
     static let terminalPalette = "terminalPalette"
+    /// Raw value of the cursor shape. See `CursorShape`.
+    static let cursorShape = "cursorShape"
+    static let cursorBlink = "cursorBlink"
 }
 
 struct SettingsView: View {
@@ -22,6 +25,8 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
     @AppStorage(SettingsKey.appearance) private var appearance = AppAppearance.dark
     @AppStorage(SettingsKey.terminalPalette) private var paletteID = TerminalPalette.defaultID
+    @AppStorage(SettingsKey.cursorShape) private var cursorShape = CursorShape.block
+    @AppStorage(SettingsKey.cursorBlink) private var cursorBlink = CursorShape.defaultBlink
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -36,6 +41,12 @@ struct SettingsView: View {
                         }
                     }
                     TerminalColorsPicker(paletteID: $paletteID) { PaletteSwatch(colors: $0) }
+                    Picker("Cursor", selection: $cursorShape) {
+                        ForEach(CursorShape.allCases) { shape in
+                            Text(shape.label).tag(shape)
+                        }
+                    }
+                    Toggle("Blink cursor", isOn: $cursorBlink)
                 } header: {
                     Text("Appearance")
                 } footer: {
@@ -125,7 +136,7 @@ struct SettingsView: View {
 }
 
 /// The phone's ed25519 or Secure Enclave key: pick the kind, make or import one, copy or install the
-/// public half, replace or delete it. Only an ed25519 key can be imported.
+/// public half, replace or delete it. An imported key, ed25519 or ECDSA, takes the ed25519 kind's place.
 private struct KeySection: View {
     @Environment(MacLink.self) private var link
     @State private var kind = LoginKeyKind.current
@@ -138,7 +149,7 @@ private struct KeySection: View {
 
     var body: some View {
         Section {
-            KeyKindPicker(kind: $kind)
+            KeyKindPicker(kind: $kind, keychainLabel: DeviceKey.label)
                 .onChange(of: kind) {
                     publicLine = PhoneKey.publicLine(kind)
                     status = nil

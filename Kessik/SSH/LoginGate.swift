@@ -29,7 +29,7 @@ struct DeviceOwnerAuthenticator: Authenticator {
 
 /// The key and password one login offers.
 struct LoginSecrets {
-    var key: Curve25519.Signing.PrivateKey?
+    var key: DeviceKey.Key?
     var password: String?
     /// The saved password for the Mac's jump host, if it has one.
     var jumpPassword: String?
@@ -76,7 +76,7 @@ struct LoginGate {
 
     var isRequired: () -> Bool
     var authenticator: Authenticator
-    var readKey: () -> Curve25519.Signing.PrivateKey?
+    var readKey: () -> DeviceKey.Key?
     var readSavedPassword: (Host) -> String?
     /// True when logins use the Secure Enclave key. Its own Face ID check then stands in for the gate.
     var usesEnclaveKey: () -> Bool = { false }

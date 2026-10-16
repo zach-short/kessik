@@ -1,8 +1,7 @@
 import SwiftUI
-import CryptoKit
 import UniformTypeIdentifiers
 
-/// Imports an OpenSSH ed25519 private key, pasted or picked from Files, as the phone's SSH key.
+/// Imports an OpenSSH ed25519 or ECDSA private key, pasted or picked from Files, as the phone's SSH key.
 /// The key text lives only in this sheet's state and is cleared when the key is saved or the sheet closes.
 struct KeyImportSheet: View {
     /// Called with the new key's `authorized_keys` line after it is saved in the Keychain.
@@ -15,7 +14,7 @@ struct KeyImportSheet: View {
     @State private var choosingFile = false
     @State private var working = false
     @State private var error: String?
-    @State private var pending: Curve25519.Signing.PrivateKey?
+    @State private var pending: DeviceKey.Key?
     @State private var confirmReplace = false
 
     /// Larger than any OpenSSH private key, so a wrong pick is not read into memory.
@@ -39,7 +38,7 @@ struct KeyImportSheet: View {
                 } header: {
                     Text("Private key")
                 } footer: {
-                    Text(error ?? "Paste the whole private key file, from -----BEGIN OPENSSH PRIVATE KEY----- to the END line, or choose the file. Only ed25519 keys work.")
+                    Text(error ?? "Paste the whole private key file, from -----BEGIN OPENSSH PRIVATE KEY----- to the END line, or choose the file. Ed25519 and ECDSA keys work.")
                         .foregroundStyle(error == nil ? Theme.textSecondary : Theme.accent)
                 }
                 if needsPassphrase {
@@ -116,7 +115,7 @@ struct KeyImportSheet: View {
         }
     }
 
-    private func save(_ key: Curve25519.Signing.PrivateKey) {
+    private func save(_ key: DeviceKey.Key) {
         do {
             try DeviceKey.save(key)
             clear()

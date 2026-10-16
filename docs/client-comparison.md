@@ -1,6 +1,6 @@
 # Echo, Termius and Blink compared with SSHTerm
 
-Source: public pages read on 2026-10-15 (developer sites, help centers and App Store listings, linked at the end). None of the three apps was installed or tested. "Not documented" means the public pages do not say, so the feature may still exist.
+Source: public pages read on 2026-10-15, and Echo's product and help pages and Termius's agent tips read again on 2026-10-16 (developer sites, help centers and App Store listings, linked at the end). None of the three apps was installed or tested. "Not documented" means the public pages do not say, so the feature may still exist.
 
 ## Does each app match the plan
 
@@ -15,7 +15,7 @@ None of the three has a tmux interface. Each one treats tmux as something the us
 | Price | $2.99 once | Free. Pro is $15 a month or $119 a year | Subscription, price not checked |
 | Saved hosts | Yes | Yes, local only | Yes |
 | Jump hosts | Not documented | Host chaining | `ProxyJump` in the host's `ssh_config` |
-| Keys (Kessik since 2026-10-16: made in the app, ed25519 or a Secure Enclave P-256 key with Face ID, or an ed25519 OpenSSH key imported by paste or from Files) | Imported keys in the Keychain, Face ID per key. In-app key generation not documented | Generated in the Secure Enclave with Face ID. Ed25519 not named | Key pairs made in the app |
+| Keys (Kessik since 2026-10-16: made in the app, ed25519 or a Secure Enclave P-256 key with Face ID, or an ed25519 or ECDSA OpenSSH key imported by paste or from Files) | Imported keys in the Keychain, Face ID per key. In-app key generation not documented | Generated in the Secure Enclave with Face ID. Ed25519 not named | Key pairs made in the app |
 | Mosh | Built in, and can install `mosh-server` on the host | Free | Built in |
 | tmux | Typed by the user | Startup command | Typed by the user, inside Mosh |
 | Snippets | Not documented | One-tap snippets, free | Snips |
@@ -38,6 +38,12 @@ Termius published eight tips for running coding agents on a phone in May 2026. S
 6. Image upload over SFTP, so a screenshot path can go into a prompt. Added on 2026-10-15: Send an image, in the terminal's tools menu, copies a photo to `/tmp/kessik` on the Mac and types its path. A HEIC photo becomes JPEG, because Claude Code does not read HEIC.
 7. A jump host for each Mac, to reach a Mac that the phone cannot reach on its own. Termius chains hosts and Blink reads `ProxyJump`. Added on 2026-10-16: each saved Mac can have a jump host (hostname, port and username), set under Jump host in the Mac's settings. The app logs in to the jump host and then reaches the Mac through it over Citadel's `jump(to:)`. The host key of each hop is checked against the key first saved for that host, and every connection the app makes (terminal, session list, image upload, port preview, liveness checks and Add to) goes the same way. Kessik takes one jump host per Mac, so a chain of more than two hops is not possible.
 8. Search in the terminal. Termius can search the text in a terminal. Added on 2026-10-16: Search the scrollback, in the terminal's tools menu, reads up to the last 10,000 lines of the tmux session with `tmux capture-pane` on a separate SSH channel, because tmux holds the history and SwiftTerm holds only the visible screen. The search is plain text and ignores case. It shows a match count, highlights each match with the lines around it, and a tap copies the line.
+
+9. ECDSA key import. Echo's product page lists Ed25519, ECDSA and OpenSSH keys. Added on 2026-10-16: Import key also takes OpenSSH ECDSA keys on P-256, P-384 and P-521, with or without a passphrase. RSA and DSA keys are still refused.
+10. A start command for each Mac. Termius's tip 2 is a per-host startup command that launches the agent, and Echo names Codex and Gemini CLI next to Claude Code. Added on 2026-10-16: each Mac can have a Start command, which New Claude session runs in the tmux session in place of `claude --remote-control`.
+11. File upload. Termius's tip 3 is SFTP upload of any file, with its path pasted into the prompt. Added on 2026-10-16: Send a file, in the terminal's tools menu, copies a file from Files to `/tmp/kessik` as it is, up to 100 MB, and types its path.
+12. Cursor style. Echo's help page lists a cursor style setting. Added on 2026-10-16: Settings > Appearance sets the cursor to Block, Bar or Underline, and turns blink on or off.
+13. A pasted `ssh` line. Echo's help page says a pasted `ssh user@hostname` line loses its `ssh` prefix. Added on 2026-10-16: a line pasted into the Mac's hostname field, with `-p`, `-l` or `-J`, or as an `ssh://` URL, fills the hostname, username, port and jump host.
 
 Termius's help center confirms the background limit that SSHTerm already plans around. iOS stops background network activity within 20 to 30 seconds, and tmux plus a fast reattach is the answer all three give for plain SSH. Only Mosh keeps the view itself alive, and Mosh waits for a later SSHTerm version.
 

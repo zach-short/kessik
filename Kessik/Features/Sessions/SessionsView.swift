@@ -58,8 +58,10 @@ struct SessionsView: View {
                     let name = Tmux.sessionName(for: path)
                     // Picking a folder that already has a session attaches to it, so nothing new starts.
                     let isNew = !store.sessions.contains { $0.name == name }
-                    launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path), title: name,
-                                           tmuxName: name, remoteControl: isNew)
+                    // A Mac's own start command may not have Remote Control, so only the default shows the card.
+                    let startCommand = link.host.customStartCommand
+                    launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path, startCommand: startCommand),
+                                           title: name, tmuxName: name, remoteControl: isNew && startCommand == nil)
                 }
             }
             .fullScreenCover(item: $launch, onDismiss: { Task { await refresh() } }) { launch in

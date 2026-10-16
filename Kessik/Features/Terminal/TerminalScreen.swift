@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 import SafariServices
 import SwiftTerm
+import UniformTypeIdentifiers
 
 /// Full-screen terminal for one host: password prompt, live shell, and clear error states.
 struct TerminalScreen: View {
@@ -26,6 +27,7 @@ struct TerminalScreen: View {
     @State private var searching = false
     @State private var pickingImage = false
     @State private var pickedImage: PhotosPickerItem?
+    @State private var pickingFile = false
     @State private var askingPort = false
     @State private var portText = ""
     @State private var forward: PortForward?
@@ -121,6 +123,9 @@ struct TerminalScreen: View {
             if let item { upload(item) }
             pickedImage = nil
         }
+        .fileImporter(isPresented: $pickingFile, allowedContentTypes: [.item]) { result in
+            if case .success(let url) = result { upload(url) }
+        }
         .alert("Preview a port", isPresented: $askingPort) {
             TextField("Port", text: $portText)
                 .keyboardType(.numberPad)
@@ -211,6 +216,7 @@ struct TerminalScreen: View {
                 Button("Search the scrollback", systemImage: "magnifyingglass") { searching = true }
             }
             Button("Send an image", systemImage: "photo") { pickingImage = true }
+            Button("Send a file", systemImage: "doc") { pickingFile = true }
             Button("Preview a port", systemImage: "safari") {
                 portText = String(previewPort)
                 askingPort = true
@@ -253,6 +259,24 @@ struct TerminalScreen: View {
             do {
                 guard let data = try await item.loadTransferable(type: Data.self) else { throw ImageUpload.Unreadable() }
                 let path = try await ImageUpload.upload(data, client: client)
+                watch.leaveHistory()
+                session.send(path + " ")
+                refocusTerminal()
+            } catch {
+                toolError = (error as? LocalizedError)?.errorDescription ?? "The upload failed: \(error)"
+            }
+        }
+    }
+
+    /// Puts a file from Files on the Mac as it is and types its path, like an image.
+    private func upload(_ url: URL) {
+        guard let client = session.sshClient else { return }
+        busy = "Uploading…"
+        Task {
+            defer { busy = nil }
+            do {
+                let file = try await ImageUpload.read(url)
+                let path = try await ImageUpload.upload(file.data, original: file.name, client: client)
                 watch.leaveHistory()
                 session.send(path + " ")
                 refocusTerminal()

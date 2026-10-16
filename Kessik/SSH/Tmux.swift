@@ -29,8 +29,10 @@ enum Tmux {
     /// `--remote-control` starts Claude Code with Remote Control on, named after the session, so the
     /// Claude app and claude.ai/code list it. tmux only runs `claude` when it creates the session;
     /// with `-A` on an existing session the flag is ignored and Remote Control stays as it was.
-    static func newClaudeCommand(name: String, path: String) -> String {
-        "exec tmux new -A -s \(quote(name)) -c \(quote(path)) claude --remote-control \(quote(name))" + mouseOn(name)
+    /// A Mac's own start command goes to tmux as one quoted string, and tmux runs it with the shell.
+    static func newClaudeCommand(name: String, path: String, startCommand: String? = nil) -> String {
+        let run = startCommand.map(quote) ?? "claude --remote-control \(quote(name))"
+        return "exec tmux new -A -s \(quote(name)) -c \(quote(path)) \(run)" + mouseOn(name)
     }
 
     /// Runs after the attach. With `mouse on`, a swipe on the phone scrolls tmux's history. It is a

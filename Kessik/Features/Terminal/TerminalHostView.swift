@@ -15,6 +15,8 @@ struct TerminalHostView: UIViewRepresentable {
     @AppStorage(SettingsKey.terminalPalette) private var paletteID = TerminalPalette.defaultID
     /// Read so the colors update when an imported palette is deleted.
     @AppStorage(CustomPalettes.key) private var customPalettes = Data()
+    @AppStorage(SettingsKey.cursorShape) private var cursorShape = CursorShape.block.rawValue
+    @AppStorage(SettingsKey.cursorBlink) private var cursorBlink = CursorShape.defaultBlink
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppStore.self) private var store
 
@@ -28,6 +30,10 @@ struct TerminalHostView: UIViewRepresentable {
             .colors(dark: colorScheme == .dark)
     }
 
+    private var cursorStyle: CursorStyle {
+        CursorShape.style(stored: cursorShape, blink: cursorBlink)
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(session: session, watch: watch)
     }
@@ -37,6 +43,7 @@ struct TerminalHostView: UIViewRepresentable {
         view.terminalDelegate = context.coordinator
         context.coordinator.apply(paletteColors, on: view)
         context.coordinator.setFont(on: view, family: fontFamily, size: fontSize)
+        context.coordinator.apply(cursorStyle, on: view)
         view.optionAsMetaKey = true
         let keyBar = KeyBar(terminal: view)
         keyBar.onCompose = onCompose
@@ -63,6 +70,9 @@ struct TerminalHostView: UIViewRepresentable {
         if context.coordinator.palette != paletteColors {
             context.coordinator.apply(paletteColors, on: view)
         }
+        if context.coordinator.cursorStyle != cursorStyle {
+            context.coordinator.apply(cursorStyle, on: view)
+        }
     }
 
     static func dismantleUIView(_ view: TerminalView, coordinator: Coordinator) {
@@ -78,6 +88,8 @@ struct TerminalHostView: UIViewRepresentable {
         private var pinchStartSize: CGFloat = 0
         /// The colors the view draws with now.
         private(set) var palette: TerminalPalette.Colors?
+        /// The cursor style picked in Settings when the view last took it.
+        private(set) var cursorStyle: CursorStyle?
 
         init(session: SSHSession, watch: ScreenWatch) {
             self.session = session
@@ -113,6 +125,13 @@ struct TerminalHostView: UIViewRepresentable {
                 view.caretColor = UIColor(hex: colors.cursor)
             }
             palette = colors
+        }
+
+        /// Sets the cursor style. Only called when the setting changes, so a style a program set
+        /// with DECSCUSR stays until then.
+        func apply(_ style: CursorStyle, on view: TerminalView) {
+            view.getTerminal().setCursorStyle(style)
+            cursorStyle = style
         }
 
         /// Steps the text size in whole points, so the shell gets a resize only when the size

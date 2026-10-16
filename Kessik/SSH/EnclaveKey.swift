@@ -11,7 +11,7 @@ extension SettingsKey {
 
 /// The two kinds of login key. The person picks one in Settings > SSH key, and logins offer only that one.
 enum LoginKeyKind: String, CaseIterable, Identifiable {
-    /// The ed25519 key in `DeviceKey`.
+    /// The key in `DeviceKey`: a generated ed25519 key, or an imported ed25519 or ECDSA key.
     case ed25519
     /// The P-256 key in `EnclaveKey`. Every login asks for Face ID.
     case secureEnclave

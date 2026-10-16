@@ -26,7 +26,7 @@ final class LoginGateTests: XCTestCase {
         LoginGate(
             isRequired: { required },
             authenticator: authenticator,
-            readKey: { [unowned self] in keyReads += 1; return key },
+            readKey: { [unowned self] in keyReads += 1; return .ed25519(key) },
             readSavedPassword: { [unowned self] _ in passwordReads += 1; return "saved" }
         )
     }
