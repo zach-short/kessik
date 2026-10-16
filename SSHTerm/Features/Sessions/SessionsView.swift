@@ -7,6 +7,8 @@ struct SessionLaunch: Identifiable {
     var command: String
     var title: String
     var tmuxName: String?
+    /// A new Claude session starts with Remote Control on. The terminal then points to the Claude app.
+    var remoteControl = false
 }
 
 struct SessionsView: View {
@@ -54,11 +56,15 @@ struct SessionsView: View {
                 FolderPicker(link: link, sessions: store.sessions) { path in
                     showPicker = false
                     let name = Tmux.sessionName(for: path)
-                    launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path), title: name, tmuxName: name)
+                    // Picking a folder that already has a session attaches to it, so nothing new starts.
+                    let isNew = !store.sessions.contains { $0.name == name }
+                    launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path), title: name,
+                                           tmuxName: name, remoteControl: isNew)
                 }
             }
             .fullScreenCover(item: $launch, onDismiss: { Task { await refresh() } }) { launch in
-                TerminalScreen(link: link, command: launch.command, title: launch.title, tmuxName: launch.tmuxName)
+                TerminalScreen(link: link, command: launch.command, title: launch.title, tmuxName: launch.tmuxName,
+                               remoteControl: launch.remoteControl)
             }
             .confirmationDialog(
                 "Kill \(pendingKill?.name ?? "")?",
@@ -307,7 +313,7 @@ struct NewClaudeSessionButton: View {
                     Text("New Claude session")
                         .font(.headline)
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Pick a repo and open Claude Code in tmux")
+                    Text("Pick a repo, then control Claude from the Claude app")
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
                 }
@@ -382,7 +388,7 @@ struct SessionRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(session.name)
-                            .font(.system(.headline, design: .monospaced))
+                            .font(MonoFont.current.font(.headline).weight(.semibold))
                             .foregroundStyle(Theme.textPrimary)
                         if session.attached {
                             Text("attached")

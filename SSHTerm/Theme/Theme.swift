@@ -27,7 +27,8 @@ enum Theme {
     static let offline = Color(uiColor: adaptive(light: black(0.3), dark: white(0.3)))
 
     static let corner: CGFloat = 14
-    static let mono = Font.system(.footnote, design: .monospaced)
+    /// Hostnames, paths and other short mono labels, in the font picked in Settings.
+    static var mono: Font { MonoFont.current.font(.footnote) }
 
     /// Picks `light` or `dark` from the trait collection in use.
     private static func adaptive(light: UIColor, dark: UIColor) -> UIColor {

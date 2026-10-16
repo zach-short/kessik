@@ -32,7 +32,7 @@ private struct PlainTextView: UIViewRepresentable {
         view.delegate = context.coordinator
         view.text = text
         view.font = UIFontMetrics(forTextStyle: .footnote)
-            .scaledFont(for: .monospacedSystemFont(ofSize: 13, weight: .regular))
+            .scaledFont(for: MonoFont.current.uiFont(size: 13))
         view.adjustsFontForContentSizeCategory = true
         view.textColor = Theme.uiTextPrimary
         view.backgroundColor = .clear

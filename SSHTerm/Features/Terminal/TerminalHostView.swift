@@ -10,6 +10,7 @@ struct TerminalHostView: UIViewRepresentable {
     let session: SSHSession
     var fontSize: Double
     let watch: ScreenWatch
+    @AppStorage(SettingsKey.monoFont) private var fontFamily = MonoFont.defaultFamily
 
     func makeCoordinator() -> Coordinator {
         Coordinator(session: session, watch: watch)
@@ -20,7 +21,7 @@ struct TerminalHostView: UIViewRepresentable {
         view.terminalDelegate = context.coordinator
         view.nativeBackgroundColor = Theme.uiBackground
         view.nativeForegroundColor = Theme.uiTerminalText
-        view.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        context.coordinator.setFont(on: view, family: fontFamily, size: fontSize)
         view.optionAsMetaKey = true
         view.inputAccessoryView = KeyBar(terminal: view)
         view.addGestureRecognizer(UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinch(_:))))
@@ -39,8 +40,8 @@ struct TerminalHostView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: TerminalView, context: Context) {
-        if view.font.pointSize != fontSize {
-            view.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        if view.font.pointSize != fontSize || context.coordinator.family != fontFamily {
+            context.coordinator.setFont(on: view, family: fontFamily, size: fontSize)
         }
     }
 
@@ -52,11 +53,23 @@ struct TerminalHostView: UIViewRepresentable {
         let session: SSHSession
         let watch: ScreenWatch
         var scroller: WheelScroller?
+        /// The family the view draws with now, as stored in Settings.
+        private(set) var family = ""
         private var pinchStartSize: CGFloat = 0
 
         init(session: SSHSession, watch: ScreenWatch) {
             self.session = session
             self.watch = watch
+        }
+
+        /// Gives SwiftTerm all four faces, so bold and italic text use the same family.
+        func setFont(on view: TerminalView, family: String, size: CGFloat) {
+            let font = MonoFont.named(family)
+            view.setFonts(normal: font.uiFont(size: size),
+                          bold: font.uiFont(size: size, weight: .bold),
+                          italic: font.uiFont(size: size, italic: true),
+                          boldItalic: font.uiFont(size: size, weight: .bold, italic: true))
+            self.family = family
         }
 
         /// Steps the text size in whole points, so the shell gets a resize only when the size
@@ -70,7 +83,7 @@ struct TerminalHostView: UIViewRepresentable {
                 let range = TerminalHostView.fontSizes
                 let size = min(max((pinchStartSize * gesture.scale).rounded(), range.lowerBound), range.upperBound)
                 guard size != view.font.pointSize else { return }
-                view.font = UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
+                setFont(on: view, family: family, size: size)
                 UserDefaults.standard.set(Double(size), forKey: SettingsKey.terminalFontSize)
             default:
                 break
