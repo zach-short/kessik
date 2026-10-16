@@ -47,7 +47,7 @@ struct RemoteControlCard: View {
     }
 
     private var caption: String {
-        var text = "If Claude Code asks to trust the folder or to confirm Remote Control, or shows an error, open the terminal and answer it. Remote Control needs a claude.ai login, not an API key."
+        var text = "If Claude Code is waiting for an answer or shows an error, open the terminal. Remote Control needs a claude.ai login, not an API key."
         if alreadyRunning {
             text += " The Claude app lists this session only if it started with Remote Control."
         }

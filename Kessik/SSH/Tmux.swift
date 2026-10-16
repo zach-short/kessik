@@ -38,30 +38,53 @@ enum Tmux {
     static let startedMarker = "__KESSIK_STARTED__"
     static let runningMarker = "__KESSIK_RUNNING__"
     static let exitedMarker = "__KESSIK_EXITED__"
+    static let trustMarker = "__KESSIK_TRUST__"
 
     /// Starts a Claude session with Remote Control on, in the background, so the phone does not attach to it.
-    /// A session with this name that exists is left as it is. The whole script runs in the Mac's own
-    /// login shell with `-i`, because a plain SSH command has no `~/.local/bin` or other `PATH` entries
-    /// from `.zshrc`, and the tmux server it may start would keep that short `PATH` for every later
-    /// session. After one second the script checks that the session is still there, because tmux
-    /// reports success for a session whose command ends at once, such as a missing `claude`.
+    /// A session with this name that exists is left as it is. The Mac's own login shell runs it with `-i`,
+    /// because a plain SSH command has no `~/.local/bin` or other `PATH` entries from `.zshrc`, and the
+    /// tmux server it may start would keep that short `PATH` for every later session. The login shell
+    /// then hands the script to `sh`, so the script reads the same whatever the login shell is.
     static func startDetachedCommand(name: String, path: String) -> String {
-        #""${SHELL:-/bin/sh}" -ilc "# + quote(startDetachedScript(name: name, path: path))
+        let script = startDetachedScript(name: name, path: path)
+        return #""${SHELL:-/bin/sh}" -ilc "# + quote("exec /bin/sh -c " + quote(script))
     }
 
-    /// What the login shell runs, apart from the shell that wraps it.
+    /// What `sh` runs. It prints one marker for `parseStart`. After it starts a session it reads the
+    /// session's screen for up to eight seconds, because tmux reports success for a session whose
+    /// command ends at once, such as a missing `claude`, and because Claude Code asks first-time
+    /// visitors to a folder whether they trust it. That question needs a person, so the marker says so.
+    /// Claude Code v2.1.301 draws "Yes, I trust this folder" for that question and a "Claude Code v"
+    /// banner once it is ready. A screen with neither after eight seconds counts as started.
     static func startDetachedScript(name: String, path: String) -> String {
+        let session = quote(name)
         let target = quote("=" + name)
-        return "command -v tmux >/dev/null 2>&1 || { echo \(noTmuxMarker); exit 0; }; "
-            + "if tmux has-session -t \(target) 2>/dev/null; then echo \(runningMarker); else "
-            + "tmux new-session -d -s \(quote(name)) -c \(quote(path)) claude --remote-control \(quote(name)); "
-            + "sleep 1; if tmux has-session -t \(target) 2>/dev/null; then echo \(startedMarker); "
-            + "else echo \(exitedMarker); fi; fi"
+        // capture-pane needs the trailing colon, or tmux reads `=name` as a pane and finds no session.
+        let pane = quote("=" + name + ":")
+        return #"""
+        command -v tmux >/dev/null 2>&1 || { echo \#(noTmuxMarker); exit 0; }
+        asks() { case "$(tmux capture-pane -p -t \#(pane) 2>/dev/null)" in *"I trust this folder"*|*"trust the files in this folder"*) return 0;; esac; return 1; }
+        if tmux has-session -t \#(target) 2>/dev/null; then
+        if asks; then echo \#(trustMarker); else echo \#(runningMarker); fi; exit 0; fi
+        tmux new-session -d -s \#(session) -c \#(quote(path)) claude --remote-control \#(session)
+        i=0
+        while [ $i -lt 16 ]; do
+        sleep 0.5
+        tmux has-session -t \#(target) 2>/dev/null || { echo \#(exitedMarker); exit 0; }
+        if asks; then echo \#(trustMarker); exit 0; fi
+        case "$(tmux capture-pane -p -t \#(pane) 2>/dev/null)" in *"Claude Code v"*|*"Welcome to Claude Code"*) echo \#(startedMarker); exit 0;; esac
+        i=$((i+1))
+        done
+        echo \#(startedMarker)
+        """#
     }
 
     enum StartResult: Equatable {
+        /// The session is running and Claude Code is showing its prompt, or it has not drawn anything yet.
         case started
         case alreadyRunning
+        /// Claude Code is asking whether to trust the folder, and only a person can answer.
+        case needsTrust
         /// tmux made the session and its command ended at once, so `claude` is probably not installed.
         case exitedAtOnce
         case noTmux
@@ -71,6 +94,7 @@ enum Tmux {
     /// this looks for the markers. Nil when none is there.
     static func parseStart(_ output: String) -> StartResult? {
         if output.contains(noTmuxMarker) { return .noTmux }
+        if output.contains(trustMarker) { return .needsTrust }
         if output.contains(runningMarker) { return .alreadyRunning }
         if output.contains(startedMarker) { return .started }
         if output.contains(exitedMarker) { return .exitedAtOnce }

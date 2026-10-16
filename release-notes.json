@@ -14,6 +14,11 @@
         },
         {
           "kind": "new",
+          "title": "Trust a new folder from the phone",
+          "detail": "The first time Claude Code opens a folder it asks whether you trust it. Kessik sees the question and opens the terminal for you to answer it, then shows the card."
+        },
+        {
+          "kind": "new",
           "title": "A key bar for Claude Code",
           "detail": "esc, ctrl, Tab, Shift-Tab and four arrow keys sit above the keyboard, with up to 16 shell symbols that you choose and order. Drag the arrow pad to move through menus. Swipe up to scroll the tmux history, and pinch to change the text size."
         },

@@ -29,6 +29,9 @@ struct SessionsView: View {
     /// The folder name of a session that is starting in the background.
     @State private var starting: String?
     @State private var ready: ReadySession?
+    /// A session that opened in the terminal to answer Claude Code's trust question. The card for it
+    /// shows when the terminal closes, if the session is still running.
+    @State private var readyAfterTerminal: ReadySession?
     @State private var startError: String?
     @State private var pendingKill: TmuxSession?
     @State private var pendingSnippet: Snippet?
@@ -76,7 +79,7 @@ struct SessionsView: View {
                     }
                 }
             }
-            .fullScreenCover(item: $launch, onDismiss: { Task { await refresh() } }) { launch in
+            .fullScreenCover(item: $launch, onDismiss: { Task { await terminalClosed() } }) { launch in
                 TerminalScreen(link: link, command: launch.command, title: launch.title, tmuxName: launch.tmuxName)
             }
             .sheet(item: $ready) { session in
@@ -201,6 +204,11 @@ struct SessionsView: View {
                 ready = ReadySession(name: name, alreadyRunning: false)
             case .alreadyRunning:
                 ready = ReadySession(name: name, alreadyRunning: true)
+            case .needsTrust:
+                // Claude Code is waiting for a person to trust the folder, so the Claude app has nothing to
+                // show yet. Open the terminal to answer it, then offer the card when the terminal closes.
+                readyAfterTerminal = ReadySession(name: name, alreadyRunning: false)
+                launch = SessionLaunch(command: Tmux.attachCommand(name), title: name, tmuxName: name)
             case .exitedAtOnce:
                 startError = "Claude Code ended as soon as it started on \(link.host.name). Check that `claude` runs in Terminal on the Mac, then try again."
             case .noTmux:
@@ -213,6 +221,15 @@ struct SessionsView: View {
         }
         starting = nil
         await refresh()
+    }
+
+    /// Refreshes the list when a terminal closes. A session that opened to answer the trust question then
+    /// gets its card, unless the answer was No and Claude Code ended the session.
+    private func terminalClosed() async {
+        await refresh()
+        guard let pending = readyAfterTerminal else { return }
+        readyAfterTerminal = nil
+        if store.sessions.contains(where: { $0.name == pending.name }) { ready = pending }
     }
 
     private func kill(_ session: TmuxSession) async {
