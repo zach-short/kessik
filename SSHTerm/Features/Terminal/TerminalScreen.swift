@@ -55,9 +55,6 @@ struct TerminalScreen: View {
                 TerminalHostView(session: session, fontSize: fontSize, watch: watch)
                     .opacity(terminalOpacity)
                 overlay
-                if showRemoteControl, session.state == .connected, let title {
-                    RemoteControlCard(name: title) { showRemoteControl = false }
-                }
                 if watch.inHistory, session.state == .connected {
                     LatestOutputButton { watch.leaveHistory() }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -87,6 +84,19 @@ struct TerminalScreen: View {
             // tmux detached or exited: go back to the session list.
             if state == .disconnected, !session.ownsClient { dismiss() }
         }
+        .sheet(isPresented: remoteControlSheet) {
+            if let title {
+                RemoteControlCard(name: title) { showRemoteControl = false }
+            }
+        }
+    }
+
+    /// The Remote Control sheet opens once the shell connects, and closes after the user picks.
+    private var remoteControlSheet: Binding<Bool> {
+        Binding(
+            get: { showRemoteControl && session.state == .connected && title != nil },
+            set: { showRemoteControl = $0 }
+        )
     }
 
     // MARK: Status line
