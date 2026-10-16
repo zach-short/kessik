@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Export options for a TestFlight / App Store upload. scripts/archive.sh adds teamID from
+  Config/Local.xcconfig to a copy in build/, so the team ID is not committed here.
+
+  manageAppVersionAndBuildNumber is false on purpose: left on, Xcode rewrites the build number
+  during export, and the number in App Store Connect stops matching the one in the archive.
+  archive.sh passes CURRENT_PROJECT_VERSION to xcodebuild instead.
+-->
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <false/>
+</dict>
+</plist>

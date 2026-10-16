@@ -7,6 +7,7 @@
 #   kessik gen               regenerate SSHTerm.xcodeproj from project.yml
 #   kessik open              open the project in Xcode
 #   kessik log               the tail of the last phone build log
+#   kessik archive           archive Release for App Store Connect (--upload to send it)
 #   kessik shell             print the three lines that go in ~/.zshrc
 #
 # The app is named Kessik. The Xcode target is still SSHTerm, so the scheme and project
@@ -118,6 +119,7 @@ ${B}kessik${O}  the Kessik app (SSHTerm target)
   gen       regenerate SSHTerm.xcodeproj from project.yml
   open      open the project in Xcode
   log       the tail of the last phone build log
+  archive   archive Release for App Store Connect (--upload to send it)
   shell     print the three lines that go in ~/.zshrc
   help      this menu
 
@@ -130,6 +132,7 @@ case "${1:-help}" in
   gen)   shift; cmd_gen "$@" ;;
   open)  shift; open "$PROJECT" ;;
   log)   shift; cmd_log "$@" ;;
+  archive) shift; exec "$ROOT/scripts/archive.sh" "$@" ;;
   shell) shift; cmd_shell ;;
   help|-h|--help) menu ;;
   *)     printf 'kessik: no command %s\n\n' "$1" >&2; menu >&2; exit 1 ;;

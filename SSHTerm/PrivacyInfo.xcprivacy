@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Kessik collects nothing and sends nothing to anyone but the SSH hosts the user adds. Hosts,
+  snippets and settings stay on the device; passwords and keys are in the Keychain.
+
+  The one "required reason" API is UserDefaults.standard: settings (@AppStorage), the host and
+  snippet lists, and trusted host keys (HostKeyStore). Only this app reads or writes them.
+
+  xcodegen picks this file up as a resource because it sits under SSHTerm/. Lottie ships its own
+  manifest inside its XCFramework.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
