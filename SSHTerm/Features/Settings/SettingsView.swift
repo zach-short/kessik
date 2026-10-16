@@ -11,6 +11,8 @@ enum SettingsKey {
     static let appearance = "appearance"
     /// The last port opened with Preview a port.
     static let previewPort = "previewPort"
+    /// Id of the terminal palette. See `TerminalPalette`.
+    static let terminalPalette = "terminalPalette"
 }
 
 struct SettingsView: View {
@@ -19,6 +21,8 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.monoFont) private var fontFamily = MonoFont.defaultFamily
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
     @AppStorage(SettingsKey.appearance) private var appearance = AppAppearance.dark
+    @AppStorage(SettingsKey.terminalPalette) private var paletteID = TerminalPalette.defaultID
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -31,10 +35,20 @@ struct SettingsView: View {
                             Text(option.label).tag(option)
                         }
                     }
+                    Picker("Terminal colors", selection: $paletteID) {
+                        ForEach(TerminalPalette.all) { palette in
+                            HStack(spacing: 10) {
+                                PaletteSwatch(colors: palette.colors(dark: colorScheme == .dark))
+                                Text(palette.name)
+                            }
+                            .tag(palette.id)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
                 } header: {
                     Text("Appearance")
                 } footer: {
-                    Text("System follows the iOS light or dark setting.")
+                    Text("System follows the iOS light or dark setting. Default terminal colors follow the theme. The other terminal colors look the same on every theme.")
                 }
 
                 Section {
@@ -353,6 +367,34 @@ private struct PasswordsSection: View {
                 count = 0
             }
         }
+    }
+}
+
+/// The palette's background with its text color and six ANSI colors on it.
+private struct PaletteSwatch: View {
+    let colors: TerminalPalette.Colors
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text("A")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(color(colors.foreground))
+            ForEach(Array(colors.ansi.dropFirst().prefix(6).enumerated()), id: \.offset) { _, hex in
+                Circle()
+                    .fill(color(hex))
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .padding(.horizontal, 5)
+        .frame(height: 20)
+        .background(color(colors.background), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Theme.stroke))
+        .accessibilityHidden(true)
+    }
+
+    private func color(_ hex: String) -> Color {
+        let rgb = RGB8(hex: hex) ?? RGB8(red: 0, green: 0, blue: 0)
+        return Color(red: Double(rgb.red) / 255, green: Double(rgb.green) / 255, blue: Double(rgb.blue) / 255)
     }
 }
 

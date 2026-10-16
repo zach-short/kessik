@@ -9,6 +9,12 @@ final class PasteTextTests: XCTestCase {
     func testBracketedPasteWrapsTheText() {
         XCTAssertEqual(PasteText.bytes("hi", bracketed: true), Array("\u{1b}[200~hi\u{1b}[201~".utf8))
     }
+
+    func testEscapeInTheTextCannotEndThePaste() {
+        let text = "a\u{1b}[201~rm -rf ~\n"
+        XCTAssertEqual(PasteText.bytes(text, bracketed: true), Array("\u{1b}[200~a[201~rm -rf ~\r\u{1b}[201~".utf8))
+        XCTAssertEqual(PasteText.bytes("\u{1b}[A", bracketed: false), Array("[A".utf8))
+    }
 }
 
 final class ImageUploadTests: XCTestCase {

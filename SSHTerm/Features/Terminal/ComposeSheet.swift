@@ -4,8 +4,10 @@ import SwiftUI
 /// turns it on), the program reads it as one paste, so a new line in a dictated prompt does not send it.
 enum PasteText {
     static func bytes(_ text: String, bracketed: Bool) -> [UInt8] {
-        // A terminal sends Return as CR, so a pasted new line does too.
-        let body = Array(text.replacingOccurrences(of: "\r\n", with: "\r").replacingOccurrences(of: "\n", with: "\r").utf8)
+        // A terminal sends Return as CR, so a pasted new line does too. ESC is dropped, so the text
+        // cannot end the bracketed paste early or send its own escape sequences.
+        let body = Array(text.replacingOccurrences(of: "\u{1b}", with: "")
+            .replacingOccurrences(of: "\r\n", with: "\r").replacingOccurrences(of: "\n", with: "\r").utf8)
         guard bracketed else { return body }
         return [0x1b, 0x5b, 0x32, 0x30, 0x30, 0x7e] + body + [0x1b, 0x5b, 0x32, 0x30, 0x31, 0x7e]
     }

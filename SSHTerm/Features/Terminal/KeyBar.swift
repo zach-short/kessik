@@ -166,7 +166,7 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         return button
     }
 
-    /// A key you drag like a trackpad: every `step` points of travel sends one arrow key.
+    /// A key you drag like a trackpad: every step of travel sends one arrow key. A tap does nothing.
     private func dragPad() -> UIButton {
         let button = key(icon: "arrow.up.and.down.and.arrow.left.and.right", label: "Drag for arrows")
         let pan = UIPanGestureRecognizer(target: self, action: #selector(dragPadPanned(_:)))
@@ -174,35 +174,30 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
         return button
     }
 
-    private var dragRemainder = CGPoint.zero
+    private var arrowDrag = ArrowDrag()
 
     @objc private func dragPadPanned(_ pan: UIPanGestureRecognizer) {
         guard let terminal else { return }
-        let step: CGFloat = 18
         switch pan.state {
         case .began:
-            dragRemainder = .zero
-            pan.setTranslation(.zero, in: pan.view)
+            arrowDrag.reset()
+            if hapticsEnabled { tapHaptic.prepare() }
+            fallthrough
         case .changed:
             let t = pan.translation(in: pan.view)
-            dragRemainder.x += t.x
-            dragRemainder.y += t.y
             pan.setTranslation(.zero, in: pan.view)
             let app = terminal.getTerminal().applicationCursor
-            func send(_ appKey: [UInt8], _ normal: [UInt8]) {
-                terminal.send(app ? appKey : normal)
+            for direction in arrowDrag.update(dx: Double(t.x), dy: Double(t.y)) {
+                switch direction {
+                case .up: terminal.send(app ? EscapeSequences.moveUpApp : EscapeSequences.moveUpNormal)
+                case .down: terminal.send(app ? EscapeSequences.moveDownApp : EscapeSequences.moveDownNormal)
+                case .left: terminal.send(app ? EscapeSequences.moveLeftApp : EscapeSequences.moveLeftNormal)
+                case .right: terminal.send(app ? EscapeSequences.moveRightApp : EscapeSequences.moveRightNormal)
+                }
                 if hapticsEnabled { tapHaptic.impactOccurred(intensity: 0.5) }
             }
-            while abs(dragRemainder.x) >= step {
-                if dragRemainder.x > 0 { send(EscapeSequences.moveRightApp, EscapeSequences.moveRightNormal); dragRemainder.x -= step }
-                else { send(EscapeSequences.moveLeftApp, EscapeSequences.moveLeftNormal); dragRemainder.x += step }
-            }
-            while abs(dragRemainder.y) >= step {
-                if dragRemainder.y > 0 { send(EscapeSequences.moveDownApp, EscapeSequences.moveDownNormal); dragRemainder.y -= step }
-                else { send(EscapeSequences.moveUpApp, EscapeSequences.moveUpNormal); dragRemainder.y += step }
-            }
         default:
-            dragRemainder = .zero
+            arrowDrag.reset()
         }
     }
 

@@ -12,6 +12,13 @@ struct TerminalHostView: UIViewRepresentable {
     let watch: ScreenWatch
     let onCompose: () -> Void
     @AppStorage(SettingsKey.monoFont) private var fontFamily = MonoFont.defaultFamily
+    @AppStorage(SettingsKey.terminalPalette) private var paletteID = TerminalPalette.defaultID
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// The palette's colors for the app theme in use. Only Default changes with the theme.
+    private var paletteColors: TerminalPalette.Colors {
+        TerminalPalette.named(paletteID).colors(dark: colorScheme == .dark)
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(session: session, watch: watch)
@@ -20,8 +27,7 @@ struct TerminalHostView: UIViewRepresentable {
     func makeUIView(context: Context) -> TerminalView {
         let view = AltScreenTerminalView(frame: .zero)
         view.terminalDelegate = context.coordinator
-        view.nativeBackgroundColor = Theme.uiBackground
-        view.nativeForegroundColor = Theme.uiTerminalText
+        context.coordinator.apply(paletteColors, on: view)
         context.coordinator.setFont(on: view, family: fontFamily, size: fontSize)
         view.optionAsMetaKey = true
         let keyBar = KeyBar(terminal: view)
@@ -46,6 +52,9 @@ struct TerminalHostView: UIViewRepresentable {
         if view.font.pointSize != fontSize || context.coordinator.family != fontFamily {
             context.coordinator.setFont(on: view, family: fontFamily, size: fontSize)
         }
+        if context.coordinator.palette != paletteColors {
+            context.coordinator.apply(paletteColors, on: view)
+        }
     }
 
     static func dismantleUIView(_ view: TerminalView, coordinator: Coordinator) {
@@ -59,6 +68,8 @@ struct TerminalHostView: UIViewRepresentable {
         /// The family the view draws with now, as stored in Settings.
         private(set) var family = ""
         private var pinchStartSize: CGFloat = 0
+        /// The colors the view draws with now.
+        private(set) var palette: TerminalPalette.Colors?
 
         init(session: SSHSession, watch: ScreenWatch) {
             self.session = session
@@ -73,6 +84,27 @@ struct TerminalHostView: UIViewRepresentable {
                           italic: font.uiFont(size: size, italic: true),
                           boldItalic: font.uiFont(size: size, weight: .bold, italic: true))
             self.family = family
+        }
+
+        /// Sets the text, background, cursor and ANSI colors. Only called when they change, because
+        /// `installColors` also drops colors a program set with OSC 4.
+        func apply(_ colors: TerminalPalette.Colors, on view: TerminalView) {
+            let background = UIColor(hex: colors.background)
+            // SwiftTerm paints the default background with the view's layer, and sets that layer
+            // only once, at init. The layer goes first so reverse video saves the new color.
+            view.layer.backgroundColor = background.cgColor
+            view.nativeBackgroundColor = background
+            view.nativeForegroundColor = UIColor(hex: colors.foreground)
+            view.installColors(colors.ansi.compactMap(RGB8.init(hex:)).map {
+                SwiftTerm.Color(red8: UInt16($0.red), green8: UInt16($0.green), blue8: UInt16($0.blue))
+            })
+            if colors.cursor == colors.foreground {
+                // SwiftTerm's default cursor is the text color and swaps with it in reverse video.
+                view.setCursorColor(source: view.getTerminal(), color: nil, textColor: nil)
+            } else {
+                view.caretColor = UIColor(hex: colors.cursor)
+            }
+            palette = colors
         }
 
         /// Steps the text size in whole points, so the shell gets a resize only when the size
@@ -140,5 +172,14 @@ final class AltScreenTerminalView: TerminalView {
             source.buffer.changeHistorySize(nil)
         }
         super.bufferActivated(source: source)
+    }
+}
+
+private extension UIColor {
+    /// A palette hex string. The palette tests check that every one parses.
+    convenience init(hex: String) {
+        let rgb = RGB8(hex: hex) ?? RGB8(red: 0, green: 0, blue: 0)
+        self.init(red: CGFloat(rgb.red) / 255, green: CGFloat(rgb.green) / 255,
+                  blue: CGFloat(rgb.blue) / 255, alpha: 1)
     }
 }
