@@ -117,10 +117,14 @@ struct SessionsView: View {
         }
 
         ForEach(store.sessions) { session in
-            SessionRow(session: session) {
-                launch = SessionLaunch(command: Tmux.attachCommand(session.name), title: session.name, tmuxName: session.name)
-            } onKill: {
+            SwipeToDelete {
                 pendingKill = session
+            } content: {
+                SessionRow(session: session) {
+                    launch = SessionLaunch(command: Tmux.attachCommand(session.name), title: session.name, tmuxName: session.name)
+                } onKill: {
+                    pendingKill = session
+                }
             }
         }
 
@@ -418,6 +422,69 @@ struct SessionRow: View {
             Button("Attach", systemImage: "arrow.right.circle", action: onAttach)
             Button("Kill session", systemImage: "xmark.circle", role: .destructive, action: onKill)
         }
+    }
+}
+
+/// Slides a row left to show a red delete button behind it. Tapping the button calls `onDelete`.
+/// Vertical drags are ignored, so the list still scrolls.
+struct SwipeToDelete<Content: View>: View {
+    var onDelete: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    private let buttonWidth: CGFloat = 72
+    @State private var offset: CGFloat = 0
+    /// The offset when the drag started. Zero when closed, `-buttonWidth` when open.
+    @State private var resting: CGFloat = 0
+
+    private var isOpen: Bool { resting != 0 }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Button(action: delete) {
+                Image(systemName: "trash")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: buttonWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(Color.red, in: RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Delete session")
+            .opacity(offset < 0 ? 1 : 0)
+
+            content()
+                .overlay {
+                    if isOpen {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { settle(to: 0) }
+                    }
+                }
+                .offset(x: offset)
+                .simultaneousGesture(swipe)
+        }
+    }
+
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                offset = min(0, max(-buttonWidth, resting + value.translation.width))
+            }
+            .onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                settle(to: offset < -buttonWidth / 2 ? -buttonWidth : 0)
+            }
+    }
+
+    private func settle(to target: CGFloat) {
+        resting = target
+        withAnimation(.snappy) { offset = target }
+    }
+
+    private func delete() {
+        settle(to: 0)
+        onDelete()
     }
 }
 
