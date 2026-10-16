@@ -87,6 +87,8 @@ struct SessionsView: View {
 
     @ViewBuilder
     private var connectedContent: some View {
+        TailscaleOffer()
+
         NewClaudeSessionButton { showPicker = true }
             .padding(.bottom, 8)
 
