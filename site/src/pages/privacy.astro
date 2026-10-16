@@ -1,49 +1,63 @@
 ---
 import Base from '../layouts/Base.astro';
+import { email } from '../site';
 ---
-<Base title="Kessik privacy policy" description="Kessik collects no data. This policy explains what the app stores on your phone and what it sends.">
-  <h1>Privacy policy</h1>
-  <p class="meta">Effective October 16, 2026</p>
+<Base title="Privacy policy" description="Kessik collects no data. This policy explains what the app stores on your phone and what it sends.">
+  <article class="wrap page">
+    <header class="rise">
+      <div class="eyebrow coral">Legal</div>
+      <h1 class="display">Privacy policy</h1>
+      <p class="lede">Effective October 16, 2026</p>
+    </header>
+    <div class="prose rise" style="--d: .08s">
+      <p>
+        Kessik is an iPhone app that connects to Macs you own over SSH. The developer, Zach Short,
+        does not run a server for the app. Kessik collects no personal data, and the developer receives
+        none.
+      </p>
 
-  <p>
-    Kessik is an iPhone app that connects to a Mac you own over SSH. The developer, Zach Short,
-    does not run a server for the app. Kessik collects no personal data, and the developer receives
-    none.
-  </p>
+      <h2>What the app stores on your phone</h2>
+      <ul>
+        <li>The name, hostname, port and username of each Mac you add.</li>
+        <li>Your settings, including the key bar layout, the Face ID setting, and your snippets and replies.</li>
+        <li>Terminal color themes you import, and fonts you add from Files.</li>
+        <li>Your SSH private key, and the passwords you choose to save. These go in the iPhone Keychain. A setting turns off saved passwords, and another asks for Face ID or your passcode before each login reads them.</li>
+        <li>The host key of each Mac you connect to, so the app can detect a change.</li>
+      </ul>
+      <p>This data stays on your phone. Deleting the app removes it.</p>
 
-  <h2>What the app stores on your phone</h2>
-  <ul>
-    <li>The hostname, username and port of your Mac, and your settings, snippets and reply chips.</li>
-    <li>Your SSH private key, and the passwords you choose to save. These go in the iPhone Keychain. A setting turns off saved passwords.</li>
-    <li>The host key of each Mac you connect to, so the app can detect a change.</li>
-  </ul>
-  <p>This data stays on your phone. Deleting the app removes it.</p>
+      <h2>What the app sends</h2>
+      <p>
+        Kessik sends data only to the Macs you add, over an encrypted SSH connection. This includes the
+        commands you type and the photos you choose to send to a Mac. The developer cannot see this
+        traffic. If you use Tailscale, Tailscale carries the connection under its own privacy policy.
+      </p>
+      <p>
+        When you export your snippets, Kessik makes a file that holds only each snippet's label, text
+        and kind. It never holds hosts, passwords or keys. You choose where the file goes.
+      </p>
 
-  <h2>What the app sends</h2>
-  <p>
-    Kessik sends data only to the Mac you enter in Settings, over an encrypted SSH connection. This
-    includes the commands you type and the photos you choose to send to the Mac. The developer cannot
-    see this traffic. If you use Tailscale, Tailscale carries the connection under its own privacy policy.
-  </p>
+      <h2>Permissions</h2>
+      <ul>
+        <li><strong>Local network.</strong> The app searches your Wi-Fi for Macs that have Remote Login on, using Bonjour. The results stay on the phone.</li>
+        <li><strong>Face ID.</strong> Used only if you turn on Require Face ID to log in. It unlocks your SSH key and saved passwords before a login. Apple does the check, and the app never sees your face data.</li>
+        <li><strong>Photos.</strong> The app reads a photo only when you pick it to send to your Mac.</li>
+      </ul>
 
-  <h2>Permissions</h2>
-  <ul>
-    <li><strong>Local network.</strong> The app searches your Wi-Fi for Macs that have Remote Login on, using Bonjour. The results stay on the phone.</li>
-    <li><strong>Photos.</strong> The app reads a photo only when you pick it to send to your Mac.</li>
-  </ul>
+      <h2>Analytics, advertising and third parties</h2>
+      <p>
+        Kessik has no analytics, no advertising, no tracking and no third-party services built in. It
+        does not sell or share data.
+      </p>
 
-  <h2>Analytics, advertising and third parties</h2>
-  <p>
-    Kessik has no analytics, no advertising, no tracking and no third-party services built in. It
-    does not sell or share data.
-  </p>
+      <h2>Children</h2>
+      <p>Kessik is a developer tool. It does not knowingly collect data from anyone, including children.</p>
 
-  <h2>Children</h2>
-  <p>Kessik is a developer tool. It does not knowingly collect data from anyone, including children.</p>
+      <h2>Changes</h2>
+      <p>If this policy changes, the new version will appear on this page with a new effective date.</p>
 
-  <h2>Changes</h2>
-  <p>If this policy changes, the new version will appear on this page with a new effective date.</p>
-
-  <h2>Contact</h2>
-  <p>Questions go to <a href="mailto:support@kessik.com">support@kessik.com</a>.</p>
+      <h2>Contact</h2>
+      <p>Questions go to <a href={`mailto:${email}`}>{email}</a>.</p>
+    </div>
+  </article>
 </Base>

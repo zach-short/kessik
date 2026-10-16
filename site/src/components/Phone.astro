@@ -1,0 +1,237 @@
+---
+// The hero: Kessik's terminal screen playing one short session. Claude asks to edit a file, the
+// option bar answers it, the phone locks while tmux keeps the work going on the Mac, and the
+// phone comes back to the same session. Option labels are cut at 34 characters the way
+// MenuOptionBar.short does it; the key bar is KeyBar.swift's fixed keys and default extras.
+const keys = ['esc', 'ctrl', '⇥', '⇤', '←', '↑', '↓', '→', '|', '~', '/', '-', '`', '$'];
+---
+<div class="demo" data-phone>
+  <div class="phone" aria-hidden="true">
+    <div class="status"><span>9:41</span><span class="bars"><i></i><i></i><i></i><i></i></span></div>
+    <div class="head">
+      <span class="dot"></span>
+      <span class="mac">studio</span>
+      <span class="path">~/code/kessik</span>
+      <span class="pill">tmux · kessik</span>
+    </div>
+    <div class="term" data-term></div>
+    <div class="options" data-options></div>
+    <div class="keys">{keys.map((k) => <span class="key">{k}</span>)}</div>
+    <div class="lock" data-lock>
+      <div class="lock-time" data-lock-time>9:42</div>
+      <div class="lock-note"><span class="dot"></span>tmux: kessik is still running</div>
+      <div class="lock-clock" data-lock-clock>0:00</div>
+    </div>
+    <div class="banner" data-banner>Reattached to kessik</div>
+  </div>
+  <p class="caption" data-caption>Ask Claude from your phone.</p>
+</div>
+
+<style>
+  .demo { display: flex; flex-direction: column; align-items: center; }
+  .phone {
+    position: relative; width: 340px; max-width: 100%; height: 640px; overflow: hidden;
+    display: flex; flex-direction: column;
+    border-radius: 46px; border: 1px solid rgba(255, 255, 255, 0.14); background: var(--ground);
+    box-shadow: 0 40px 90px rgba(0, 0, 0, 0.6), 0 0 120px rgba(255, 97, 92, 0.12), inset 0 0 0 6px #050506;
+    padding: 6px; user-select: none; -webkit-user-select: none;
+  }
+  .status { display: flex; justify-content: space-between; padding: 14px 24px 6px; font: 600 14px/1 var(--sans); }
+  .bars { display: inline-flex; gap: 2px; align-items: flex-end; }
+  .bars i { width: 3px; background: var(--fg); border-radius: 1px; }
+  .bars i:nth-child(1) { height: 4px; } .bars i:nth-child(2) { height: 6px; } .bars i:nth-child(3) { height: 8px; } .bars i:nth-child(4) { height: 10px; }
+  .head { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-bottom: 1px solid var(--edge); font: 500 12px/1 var(--mono); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); flex: none; }
+  .mac { color: var(--fg); font-weight: 600; }
+  .path { color: var(--faint); }
+  .pill { margin-left: auto; color: var(--muted); background: rgba(255, 255, 255, 0.06); padding: 4px 7px; border-radius: 6px; font-size: 10.5px; }
+
+  .term { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 12px 14px; font: 400 12px/1.6 var(--mono); color: var(--fg); }
+  .term :global(div) { white-space: pre-wrap; word-break: break-word; min-height: 1.6em; }
+  .term :global(.dim) { color: var(--faint); }
+  .term :global(.you) { color: var(--fg); }
+  .term :global(.you)::first-letter { color: var(--coral); }
+  .term :global(.tool)::first-letter { color: var(--green); }
+  .term :global(.add) { color: var(--green); }
+  .term :global(.del) { color: var(--coral); }
+  .term :global(.ask) { color: var(--amber); }
+  .term :global(.sel) { color: var(--fg); }
+  .term :global(.caret)::after { content: ''; display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: -2px; background: var(--fg); }
+
+  /* MenuOptionBar: a coral number in a circle, then the label, on a raised capsule. */
+  .options { display: flex; gap: 8px; padding: 0 12px; height: 0; overflow: hidden; transition: height 0.3s var(--ease), padding 0.3s var(--ease); }
+  .options.on { height: 40px; padding-bottom: 8px; }
+  .options :global(button) {
+    display: inline-flex; align-items: center; gap: 6px; flex: none; height: 32px; padding: 0 12px 0 6px;
+    background: var(--raised); border: 1px solid transparent; border-radius: 999px; color: var(--fg);
+    font: 500 13px/1 var(--sans); cursor: pointer; transition: transform 0.15s var(--ease), border-color 0.2s;
+  }
+  .options :global(button:first-child) { border-color: rgba(255, 97, 92, 0.7); }
+  .options :global(button b) { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--coral); color: var(--ground); font-size: 12px; }
+  .options :global(button.tap) { transform: scale(0.94); box-shadow: 0 0 0 6px rgba(255, 97, 92, 0.18); }
+
+  .keys { display: flex; gap: 5px; padding: 8px 10px 24px; border-top: 1px solid var(--edge); background: #111114; overflow: hidden; -webkit-mask: linear-gradient(90deg, #000 85%, transparent); mask: linear-gradient(90deg, #000 85%, transparent); border-radius: 0 0 40px 40px; }
+  .key { flex: none; min-width: 30px; height: 32px; padding: 0 7px; display: grid; place-items: center; border-radius: 7px; background: #26262b; color: var(--fg); font: 500 12.5px/1 var(--mono); }
+
+  .lock {
+    position: absolute; inset: 6px; border-radius: 40px; display: flex; flex-direction: column; align-items: center; padding-top: 92px; gap: 14px;
+    background: radial-gradient(ellipse 90% 50% at 50% 110%, rgba(255, 97, 92, 0.35), transparent 70%), rgba(8, 8, 10, 0.9);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    opacity: 0; visibility: hidden; transition: opacity 0.5s var(--ease), visibility 0.5s;
+  }
+  .lock.on { opacity: 1; visibility: visible; }
+  .lock-time { font: 600 76px/1 var(--sans); letter-spacing: -0.03em; }
+  .lock-note { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.08); font: 500 12px/1 var(--mono); color: var(--fg); }
+  .lock-note .dot { animation: pulse 1.6s ease-in-out infinite; }
+  .lock-clock { font: 500 12px/1 var(--mono); color: var(--faint); }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .term :global(.caret)::after { animation: blink 1.05s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  }
+
+  .banner {
+    position: absolute; top: 48px; left: 50%; transform: translate(-50%, -12px); padding: 8px 14px; border-radius: 999px;
+    background: rgba(61, 219, 133, 0.14); border: 1px solid rgba(61, 219, 133, 0.4); color: var(--green);
+    font: 600 12px/1 var(--mono); white-space: nowrap; opacity: 0; transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+  }
+  .banner.on { opacity: 1; transform: translate(-50%, 0); }
+
+  .caption { margin-top: 18px; min-height: 2.9em; max-width: 340px; text-align: center; font: 500 13px/1.45 var(--mono); color: var(--muted); }
+</style>
+
+<script>
+  type Line = [cls: string, text: string];
+  const root = document.querySelector<HTMLElement>('[data-phone]');
+  if (root) {
+    const $ = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const term = $('[data-term]'), options = $('[data-options]'), lock = $('[data-lock]');
+    const lockTime = $('[data-lock-time]'), lockClock = $('[data-lock-clock]'), banner = $('[data-banner]'), caption = $('[data-caption]');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const ASK = 'add a dark mode toggle to settings';
+    const work: Line[] = [
+      ['tool', '● Read(SettingsView.swift)'],
+      ['tool', '● Update(SettingsView.swift)'],
+      ['add', '  + Toggle("Dark mode", isOn: $dark)'],
+      ['del', '  - // TODO: appearance'],
+    ];
+    const menu: Line[] = [
+      ['ask', 'Do you want to make this edit?'],
+      ['sel', '› 1. Yes'],
+      ['dim', '  2. Yes, allow all edits during this session'],
+      ['dim', '  3. No, and tell Claude what to do differently'],
+    ];
+    const chips = ['Yes', 'Yes, allow all edits during this…', 'No, and tell Claude what to do di…'];
+    const later: Line[] = [
+      ['tool', '● Bash(xcodebuild test -scheme Kessik)'],
+      ['dim', '  Executed 112 tests, with 0 failures'],
+      ['tool', '● Done. Settings has a dark mode toggle.'],
+    ];
+
+    const line = ([cls, text]: Line) => {
+      const el = document.createElement('div');
+      el.className = cls;
+      el.textContent = text;
+      term.append(el);
+      while (term.childElementCount > 18) term.firstElementChild!.remove();
+      return el;
+    };
+    const say = (text: string) => { caption.textContent = text; };
+
+    // The demo only runs while it is on screen and the tab is visible.
+    let visible = true;
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(root);
+    const sleep = (ms: number) => new Promise<void>((done) => {
+      const tick = (left: number, at: number) => setTimeout(() => {
+        const now = performance.now();
+        // Capped, so a timer the browser held back in a hidden tab cannot skip a step.
+        const next = visible && !document.hidden ? left - Math.min(now - at, 150) : left;
+        next <= 0 ? done() : tick(next, now);
+      }, Math.min(left, 100));
+      tick(ms, performance.now());
+    });
+    const type = async (el: HTMLElement, text: string) => {
+      el.classList.add('caret');
+      for (const ch of text) { el.textContent += ch; await sleep(28 + Math.random() * 40); }
+    };
+
+    // Resolves with the tapped option's index, or with 0 after `ms`, as if Yes were tapped.
+    const choose = (ms: number) => new Promise<number>((done) => {
+      options.replaceChildren(...chips.map((label, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.tabIndex = -1;
+        b.innerHTML = `<b>${i + 1}</b>`;
+        b.append(label);
+        b.onclick = () => pick(i);
+        return b;
+      }));
+      options.classList.add('on');
+      let picked = false;
+      const pick = (i: number) => {
+        if (picked) return;
+        picked = true;
+        options.children[i].classList.add('tap');
+        setTimeout(() => { options.classList.remove('on'); done(i); }, 260);
+      };
+      sleep(ms).then(() => pick(0));
+    });
+
+    const finalFrame = () => {
+      term.replaceChildren();
+      [['dim', 'tmux new -A -s kessik claude'], ['you', `> ${ASK}`], ...work, ...later].forEach((l) => line(l as Line));
+      line(['you caret', '> ']);
+      say('Every session runs in tmux on your Mac, so it outlives a locked phone.');
+    };
+
+    const run = async () => {
+      for (;;) {
+        term.replaceChildren();
+        say('Ask Claude from your phone.');
+        line(['dim', 'tmux new -A -s kessik claude']);
+        await sleep(700);
+        const you = line(['you', '> ']);
+        await type(you, ASK);
+        you.classList.remove('caret');
+        for (const l of work) { await sleep(520); line(l); }
+        await sleep(500);
+        const shown = menu.map(line);
+        say('A permission prompt becomes buttons. Tap one.');
+        const picked = await choose(2600);
+        shown.forEach((el) => el.remove());
+        if (picked === 2) {
+          line(['dim', '  ✗ Edit declined']);
+          line(['you caret', '> ']);
+          say('You said no, so Claude waits for your next prompt.');
+          await sleep(3200);
+          continue;
+        }
+        line(['dim', '  ✓ Edit applied']);
+        say('Claude carries on with the next step.');
+        await sleep(500);
+        line(later[0]);
+        await sleep(900);
+
+        say('Lock the phone. Claude keeps working on the Mac.');
+        lock.classList.add('on');
+        // Sixteen minutes pass on the lock screen in about four seconds.
+        for (let minutes = 0; minutes <= 16; minutes++) {
+          lockTime.textContent = `9:${42 + minutes}`;
+          lockClock.textContent = `running for ${minutes} min`;
+          await sleep(230);
+        }
+        later.slice(1).forEach(line);
+        lock.classList.remove('on');
+        banner.classList.add('on');
+        say('Open Kessik and you are back in the same session.');
+        await sleep(1800);
+        banner.classList.remove('on');
+        line(['you caret', '> ']);
+        await sleep(3200);
+      }
+    };
+
+    reduce ? finalFrame() : run();
+  }
+</script>

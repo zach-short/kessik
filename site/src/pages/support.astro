@@ -1,26 +1,35 @@
 ---
 import Base from '../layouts/Base.astro';
+import { email } from '../site';
 ---
-<Base title="Kessik support" description="Get help with Kessik, the iPhone app that opens Claude Code on your Mac over SSH.">
-  <h1>Support</h1>
-  <p class="lede">Email <a href="mailto:support@kessik.com">support@kessik.com</a>. Include your iPhone model, the iOS version and the exact message the app shows.</p>
+<Base title="Support" description="Get help with Kessik, the iPhone app that opens Claude Code on your Mac over SSH.">
+  <article class="wrap page">
+    <header class="rise">
+      <div class="eyebrow coral">Support</div>
+      <h1 class="display">How can we help?</h1>
+      <p class="lede">Email <a href={`mailto:${email}`}>{email}</a>. Include your iPhone model, the iOS version and the exact message the app shows.</p>
+    </header>
+    <div class="prose rise" style="--d: .08s">
+      <h2>Connection checklist</h2>
+      <ol>
+        <li>On the Mac, open System Settings, General, Sharing and turn on Remote Login.</li>
+        <li>Install tmux with <code>brew install tmux</code>. Kessik looks in <code>/opt/homebrew/bin</code> and <code>/usr/local/bin</code>.</li>
+        <li>Install Claude Code and run <code>claude</code> once in Terminal to sign in.</li>
+        <li>In Kessik, open Settings, Macs, Add Mac. Enter a name, the hostname, the port and the username of the Mac.</li>
+        <li>Away from home, turn on Tailscale on both devices and use the Tailscale address.</li>
+      </ol>
 
-  <h2>Connection checklist</h2>
-  <ol>
-    <li>On the Mac, open System Settings, General, Sharing and turn on Remote Login.</li>
-    <li>Install tmux with <code>brew install tmux</code>. Kessik looks in <code>/opt/homebrew/bin</code> and <code>/usr/local/bin</code>.</li>
-    <li>Install Claude Code and run <code>claude</code> once in Terminal to sign in.</li>
-    <li>In Kessik, open Settings and enter the hostname, username and port of the Mac.</li>
-    <li>Away from home, turn on Tailscale on both devices and use the Tailscale address.</li>
-  </ol>
+      <h2>Common problems</h2>
+      <h3>The host key changed</h3>
+      <p>Kessik saves the first host key a Mac shows. If a later connection shows a different key, the app stops. This happens after a Mac is reset or replaced. It can also mean someone is intercepting the connection, so confirm the change before you trust it.</p>
+      <h3>The Remote Control message shows in the terminal</h3>
+      <p>Remote Control needs a claude.ai login on the Mac. If Claude Code uses an API key, it still starts, and it shows a Remote Control error.</p>
+      <h3>The .local name does not work</h3>
+      <p>A <code>.local</code> name works on the same Wi-Fi only. Use the Tailscale address on other networks.</p>
+      <h3>Face ID asks before every login</h3>
+      <p>That is the Require Face ID to log in setting. Turn it off in Settings if you do not want the check.</p>
 
-  <h2>Common problems</h2>
-  <h3>The host key changed</h3>
-  <p>Kessik saves the first host key a Mac shows. If a later connection shows a different key, the app stops. This happens after a Mac is reset or replaced. It can also mean someone is intercepting the connection, so confirm the change before you trust it.</p>
-  <h3>The Remote Control message shows in the terminal</h3>
-  <p>Remote Control needs a claude.ai login on the Mac. If Claude Code uses an API key, it still starts, and it shows a Remote Control error.</p>
-  <h3>The .local name does not work</h3>
-  <p>A <code>.local</code> name works on the same Wi-Fi only. Use the Tailscale address on other networks.</p>
-
-  <p class="meta">Kessik does not support Mosh. The app saves one Mac at a time.</p>
+      <p class="note">Kessik does not support Mosh. You can save several Macs. The Sessions tab uses the one that is checked in Settings.</p>
+    </div>
+  </article>
 </Base>
