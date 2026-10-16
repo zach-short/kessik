@@ -14,7 +14,7 @@ struct FontPicker: View {
             Section("Built into iOS") {
                 ForEach(MonoFont.builtIn) { row($0) }
             }
-            Section("Included with SSHTerm") {
+            Section("Included with Kessik") {
                 ForEach(MonoFont.bundled) { row($0) }
             }
             Section {

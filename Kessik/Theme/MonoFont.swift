@@ -88,7 +88,7 @@ enum FontLibrary {
             case .notMonospaced(let family):
                 "\(family) is not monospaced. The terminal needs a font where every character has the same width."
             case .included(let family):
-                "SSHTerm already includes \(family)."
+                "Kessik already includes \(family)."
             }
         }
     }
