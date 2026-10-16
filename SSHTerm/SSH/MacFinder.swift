@@ -74,7 +74,7 @@ final class MacFinder {
 
     private static func message(for error: NWError) -> String {
         if case .dns(let code) = error, Int(code) == kDNSServiceErr_PolicyDenied {
-            return "SSHTerm cannot see the local network. Turn on Local Network for SSHTerm in iOS Settings > Privacy & Security > Local Network."
+            return "Kessik cannot see the local network. Turn on Local Network for Kessik in iOS Settings > Privacy & Security > Local Network."
         }
         return "The search stopped: \(error.localizedDescription)"
     }

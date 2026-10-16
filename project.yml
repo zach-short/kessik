@@ -49,8 +49,8 @@ targets:
         # Holds only the launch screen; Xcode adds the INFOPLIST_KEY_ values below to it.
         INFOPLIST_FILE: Config/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        INFOPLIST_KEY_CFBundleDisplayName: SSHTerm
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: SSHTerm connects to computers on your local network over SSH.
+        INFOPLIST_KEY_CFBundleDisplayName: Kessik
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Kessik connects to computers on your local network over SSH.
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         MARKETING_VERSION: "0.1.0"

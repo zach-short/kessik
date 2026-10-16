@@ -2,6 +2,8 @@ import SwiftUI
 
 enum SettingsKey {
     static let terminalFontSize = "terminalFontSize"
+    /// Family name of the mono font. See `MonoFont`.
+    static let monoFont = "monoFont"
     static let hapticsEnabled = "hapticsEnabled"
     /// Read once to move an address typed before Settings had a Mac section. See `SavedMac`.
     static let sessionsAddress = "sessionsAddress"
@@ -12,6 +14,7 @@ enum SettingsKey {
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
     @AppStorage(SettingsKey.terminalFontSize) private var fontSize = 13.0
+    @AppStorage(SettingsKey.monoFont) private var fontFamily = MonoFont.defaultFamily
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
     @AppStorage(SettingsKey.appearance) private var appearance = AppAppearance.dark
 
@@ -32,7 +35,12 @@ struct SettingsView: View {
                     Text("System follows the iOS light or dark setting.")
                 }
 
-                Section("Terminal") {
+                Section {
+                    NavigationLink {
+                        FontPicker()
+                    } label: {
+                        LabeledContent("Font", value: MonoFont.named(fontFamily).family)
+                    }
                     Stepper(value: $fontSize, in: 9...24, step: 1) {
                         HStack {
                             Text("Text size")
@@ -43,8 +51,12 @@ struct SettingsView: View {
                         }
                     }
                     Text("claude --continue")
-                        .font(.system(size: fontSize, design: .monospaced))
+                        .font(Font(MonoFont.named(fontFamily).uiFont(size: fontSize)))
                         .foregroundStyle(Theme.textPrimary)
+                } header: {
+                    Text("Terminal")
+                } footer: {
+                    Text("The font is also used for hostnames, paths and session names.")
                 }
 
                 Section {
@@ -86,7 +98,7 @@ struct SettingsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("SSHTerm")
+                            Text("Kessik")
                                 .font(.headline)
                             Text("Version \(Bundle.main.shortVersion)")
                                 .font(Theme.mono)

@@ -17,7 +17,7 @@ struct SplashView: View {
                     .animationDidFinish { _ in onFinish() }
                     .resizable()
                     .frame(width: 220, height: 220)
-                Text("sshterm")
+                Text("kessik")
                     .font(.system(.subheadline, design: .monospaced).weight(.medium))
                     .tracking(3)
                     .foregroundStyle(Theme.textTertiary)
