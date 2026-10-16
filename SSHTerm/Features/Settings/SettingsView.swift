@@ -9,6 +9,8 @@ enum SettingsKey {
     static let sessionsAddress = "sessionsAddress"
     static let rememberPasswords = "rememberPasswords"
     static let appearance = "appearance"
+    /// The last port opened with Preview a port.
+    static let previewPort = "previewPort"
 }
 
 struct SettingsView: View {

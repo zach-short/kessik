@@ -34,6 +34,7 @@ enum SavedSnippets {
         Snippet(label: "Yes", text: "yes", kind: .reply),
         Snippet(label: "Commit this", text: "commit this", kind: .reply),
         Snippet(label: "What's next", text: "whats next", kind: .reply),
+        Snippet(label: "Delegate next", text: "delegate next item in passoff", kind: .reply),
         Snippet(label: "/usage", text: "/usage", kind: .reply),
     ]
 

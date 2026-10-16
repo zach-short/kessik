@@ -22,6 +22,8 @@ A swipe up scrolls the history of the tmux session, because the app turns on tmu
 
 When Claude Code shows a numbered menu, such as a permission prompt, the app reads the menu from the screen and shows one button per option. A tap on a button sends that option's number.
 
+The pencil key on the bar opens a text box for a long or dictated prompt. Insert puts the text into the terminal as one paste, so a new line in it does not send the prompt early, and Send adds Return. The same box is in the tools menu at the top right of the terminal, which also holds two more items. Send an image copies a photo to `/tmp/kessik` on the Mac over SFTP and types its path, so the image can go into a Claude prompt. Preview a port forwards a port on the phone to the same port on the Mac over the SSH connection, and opens it in Safari inside the app, so a dev server that listens only on the Mac shows on the phone. The forward closes with the terminal.
+
 Reply chips above the terminal type a saved reply and Return, such as `continue` or `yes`. Command snippets appear in the Sessions tab, and each one runs in a new terminal on the Mac after the app asks. Both kinds are edited in Settings > Snippets.
 
 ### Logging in

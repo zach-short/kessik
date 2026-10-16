@@ -29,19 +29,17 @@ Echo needs iOS 26 or later. It uses Ghostty's terminal engine.
 Termius published eight tips for running coding agents on a phone in May 2026. Some of them, and some of Echo's keyboard behavior, match gaps in SSHTerm. The plan says not to copy another app's UI or branding, and these are behaviors described in public docs, so they fall inside that rule.
 
 1. A Shift+Tab key. Claude Code uses Shift+Tab to cycle its modes (default, accept edits, plan). Added on 2026-10-15: the key after Tab on the key bar sends `ESC [ Z`.
-2. Drag gestures for arrow keys. Termius moves up and down with a long press and drag, and left and right by holding Space and dragging. Echo has a similar gesture. This helps in Claude Code's menus.
+2. Drag gestures for arrow keys. Termius moves up and down with a long press and drag, and left and right by holding Space and dragging. Echo has a similar gesture. This helps in Claude Code's menus. Added: a drag pad on the key bar sends one arrow key for each 18 points of travel. The system keyboard's Space bar is not open to apps, so the Space drag is not possible.
 3. Pinch to change the text size. Echo and Blink both do this. Added on 2026-10-15: a pinch steps the size in whole points from 9 to 24 and saves it, so Settings and the next terminal use it.
-4. Dictation sent as one paste. Termius has a Paste mode above its key bar, so a dictated prompt reaches the terminal in one piece.
-5. Local port forwarding to preview a dev server in the phone's browser. This needs a check of Citadel's port forwarding support first.
-6. Image upload over SFTP, so a screenshot path can go into a prompt.
+4. Dictation sent as one paste. Termius has a Paste mode above its key bar, so a dictated prompt reaches the terminal in one piece. Added on 2026-10-15: Write a prompt, on the key bar and in the terminal's tools menu, opens a text box. Insert or Send puts the text in as one bracketed paste, and Send adds Return.
+5. Local port forwarding to preview a dev server in the phone's browser. Added on 2026-10-15: Preview a port, in the terminal's tools menu, forwards a port on the phone to the same port on the Mac's localhost over Citadel's direct TCP/IP channels, and opens it in Safari inside the app. Safari stays inside the app because iOS suspends a background app and its listener.
+6. Image upload over SFTP, so a screenshot path can go into a prompt. Added on 2026-10-15: Send an image, in the terminal's tools menu, copies a photo to `/tmp/kessik` on the Mac and types its path. A HEIC photo becomes JPEG, because Claude Code does not read HEIC.
 
 Termius's help center confirms the background limit that SSHTerm already plans around. iOS stops background network activity within 20 to 30 seconds, and tmux plus a fast reattach is the answer all three give for plain SSH. Only Mosh keeps the view itself alive, and Mosh waits for a later SSHTerm version.
 
 ## Notes for the light theme decision
 
-SSHTerm is dark only. `SSHTermApp.swift` forces `.preferredColorScheme(.dark)`, and the tokens in `Theme.swift` are fixed white-on-black values.
-
-None of the three apps documents a light mode for the app itself. Each one treats light as a terminal color theme that the user picks.
+The app has had Dark, Light and System themes since the light theme commit. Dark is the default. None of the three apps documents a light mode for the app itself. Each one treats light as a terminal color theme that the user picks.
 
 A light terminal has a side effect for Claude Code. Claude Code picks dark or light colors from its `theme` setting, and its `auto` value reads the terminal background with an OSC 11 query when it starts. SwiftTerm answers that query (`reportColor` in its `Terminal.swift`). However, tmux sits between the two, and a Claude session keeps the colors it chose at launch even when the phone later shows it on a different background. An open issue from August 2026 also reports that `auto` picks the opposite theme on some terminals. The result can be Claude Code's dark-theme colors on a white background.
 

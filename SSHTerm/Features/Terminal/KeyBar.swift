@@ -9,6 +9,8 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
     private var repeatTimer: Timer?
     private let tapHaptic = UIImpactFeedbackGenerator(style: .light)
     private let copyHaptic = UINotificationFeedbackGenerator()
+    /// Opens the prompt box. The terminal screen sets it.
+    var onCompose: (() -> Void)?
 
     var enableInputClicksWhenVisible: Bool { true }
 
@@ -87,6 +89,7 @@ final class KeyBar: UIInputView, UIInputViewAudioFeedback {
             stack.addArrangedSubview(key(symbol) { $0.send(txt: symbol) })
         }
 
+        fixed.addArrangedSubview(key(icon: "square.and.pencil", label: "Write a prompt") { [weak self] _ in self?.onCompose?() })
         fixed.addArrangedSubview(key(icon: "doc.on.doc", label: "Copy", tapFeedback: false) { [weak self] t in self?.copy(from: t) })
         fixed.addArrangedSubview(key(icon: "doc.on.clipboard", label: "Paste") { $0.paste(nil) })
         fixed.addArrangedSubview(key(icon: "keyboard.chevron.compact.down", label: "Hide keyboard") { _ = $0.resignFirstResponder() })

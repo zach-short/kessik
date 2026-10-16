@@ -28,3 +28,5 @@ Dev servers almost never appear as Bash calls. The common checks are `bun run ty
 | Git glance | `git status --short && git worktree list` | shell |
 
 Two kinds of shortcut follow from this. Shell snippets run before or outside Claude. Reply chips type short text into a running Claude session, and they are the bigger win on a phone because "continue", "yes" and "commit this" make up most mid-session input.
+
+The app ships the reply chips Continue, Yes, Commit this, What's next, Delegate next and /usage as defaults. These apply only to a phone that has no saved snippets. The new-or-attach rows are covered by New Claude session in the Sessions tab, and the shell rows are left for the user to add in Settings > Snippets.

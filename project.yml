@@ -58,3 +58,23 @@ targets:
         SWIFT_VERSION: "5.0"
         CODE_SIGN_STYLE: Automatic
         ENABLE_PREVIEWS: YES
+  SSHTermTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [SSHTermTests]
+    dependencies:
+      - target: SSHTerm
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: $(SSHTERM_BUNDLE_ID).tests
+        SWIFT_VERSION: "5.0"
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/SSHTerm.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SSHTerm
+        BUNDLE_LOADER: $(TEST_HOST)
+schemes:
+  SSHTerm:
+    build:
+      targets:
+        SSHTerm: all
+    test:
+      targets: [SSHTermTests]

@@ -10,6 +10,7 @@ struct TerminalHostView: UIViewRepresentable {
     let session: SSHSession
     var fontSize: Double
     let watch: ScreenWatch
+    let onCompose: () -> Void
     @AppStorage(SettingsKey.monoFont) private var fontFamily = MonoFont.defaultFamily
 
     func makeCoordinator() -> Coordinator {
@@ -17,13 +18,15 @@ struct TerminalHostView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> TerminalView {
-        let view = TerminalView(frame: .zero)
+        let view = AltScreenTerminalView(frame: .zero)
         view.terminalDelegate = context.coordinator
         view.nativeBackgroundColor = Theme.uiBackground
         view.nativeForegroundColor = Theme.uiTerminalText
         context.coordinator.setFont(on: view, family: fontFamily, size: fontSize)
         view.optionAsMetaKey = true
-        view.inputAccessoryView = KeyBar(terminal: view)
+        let keyBar = KeyBar(terminal: view)
+        keyBar.onCompose = onCompose
+        view.inputAccessoryView = keyBar
         view.addGestureRecognizer(UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinch(_:))))
         // Taps, long press and text selection work as in a plain shell. Without this, SwiftTerm
         // sends them to tmux (mouse on) as clicks and drags. Only WheelScroller sends mouse events.
@@ -120,5 +123,22 @@ struct TerminalHostView: UIViewRepresentable {
         func bell(source: TerminalView) {}
         func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
         func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
+    }
+}
+
+/// Keeps the alternate screen (tmux, vim, less) at one screen of lines.
+///
+/// SwiftTerm 1.19.0 raises the empty alternate screen's line limit when the view grows, but does
+/// not lower it when the view shrinks. The terminal opens tall and the keyboard then shrinks it,
+/// often before tmux starts. Each tmux scroll then adds a line instead of reusing one, and SwiftTerm
+/// rests on the last line: the text drops by the space left under the last row, and the bottom of
+/// an old row shows cut at the top.
+final class AltScreenTerminalView: TerminalView {
+    override func bufferActivated(source: Terminal) {
+        if source.isCurrentBufferAlternate {
+            // Sets the limit back to the row count. The cursor and scroll region stay as they are.
+            source.buffer.changeHistorySize(nil)
+        }
+        super.bufferActivated(source: source)
     }
 }

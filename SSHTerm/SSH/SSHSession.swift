@@ -64,6 +64,9 @@ final class SSHSession {
 
     var ownsClient: Bool { link == nil }
 
+    /// The open connection, for port forwards and file uploads next to the shell.
+    var sshClient: SSHClient? { state == .connected ? client : nil }
+
     /// `password` nil means the key and the saved password only. `remember` saves a typed password
     /// once the login works, or removes a saved one.
     func connect(password: String?, remember: Bool = true) {
