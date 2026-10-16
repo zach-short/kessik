@@ -8,6 +8,7 @@
 #   kessik open              open the project in Xcode
 #   kessik log               the tail of the last phone build log
 #   kessik archive           archive Release for App Store Connect (--upload to send it)
+#   kessik deploy            build the website in site/ and publish it to Cloudflare Pages
 #   kessik shell             print the three lines that go in ~/.zshrc
 #
 # This file only wraps the commands; the build settings live in project.yml and Config/.
@@ -100,6 +101,15 @@ cmd_log() {
   tail -n 80 "$LOG"
 }
 
+cmd_deploy() {
+  # site/package.json owns the deploy steps: astro build, then wrangler pages deploy to the
+  # kessik project on main. This only checks that the tools are installed before running it.
+  [[ -d "$ROOT/site/node_modules" ]] || die "site/ has no node_modules. Run: npm --prefix site ci"
+  say "Building and deploying the site"
+  npm --prefix "$ROOT/site" run deploy
+  printf '\n%sThe site is published.%s\n' "$D" "$O"
+}
+
 cmd_shell() {
   cat <<SNIPPET
 # kessik: the app's own commands, from anywhere. \`kessik\` alone prints the menu.
@@ -118,6 +128,7 @@ ${B}kessik${O}  the Kessik app
   open      open the project in Xcode
   log       the tail of the last phone build log
   archive   archive Release for App Store Connect (--upload to send it)
+  deploy    build the website in site/ and publish it to Cloudflare Pages
   shell     print the three lines that go in ~/.zshrc
   help      this menu
 
@@ -131,6 +142,7 @@ case "${1:-help}" in
   open)  shift; open "$PROJECT" ;;
   log)   shift; cmd_log "$@" ;;
   archive) shift; exec "$ROOT/scripts/archive.sh" "$@" ;;
+  deploy) shift; cmd_deploy "$@" ;;
   shell) shift; cmd_shell ;;
   help|-h|--help) menu ;;
   *)     printf 'kessik: no command %s\n\n' "$1" >&2; menu >&2; exit 1 ;;
