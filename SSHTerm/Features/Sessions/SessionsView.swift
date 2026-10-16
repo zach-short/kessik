@@ -117,12 +117,13 @@ struct SessionsView: View {
         }
 
         ForEach(store.sessions) { session in
+            let attach = { launch = SessionLaunch(command: Tmux.attachCommand(session.name), title: session.name, tmuxName: session.name) }
             SwipeToDelete {
                 pendingKill = session
+            } onTap: {
+                attach()
             } content: {
-                SessionRow(session: session) {
-                    launch = SessionLaunch(command: Tmux.attachCommand(session.name), title: session.name, tmuxName: session.name)
-                } onKill: {
+                SessionRow(session: session, onAttach: attach) {
                     pendingKill = session
                 }
             }
@@ -381,43 +382,41 @@ struct SessionRow: View {
     var onKill: () -> Void = {}
 
     var body: some View {
-        Button(action: onAttach) {
-            HStack(spacing: 14) {
-                Image(systemName: "terminal")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(width: 40, height: 40)
-                    .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        HStack(spacing: 14) {
+            Image(systemName: "terminal")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 40, height: 40)
+                .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(session.name)
-                            .font(MonoFont.current.font(.headline).weight(.semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                        if session.attached {
-                            Text("attached")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(Theme.online)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Theme.online.opacity(0.12), in: Capsule())
-                        }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(session.name)
+                        .font(MonoFont.current.font(.headline).weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    if session.attached {
+                        Text("attached")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Theme.online)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.online.opacity(0.12), in: Capsule())
                     }
-                    Text("\(session.path) · \(session.windows) window\(session.windows == 1 ? "" : "s")")
-                        .font(Theme.mono)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
                 }
-                Spacer(minLength: 8)
-                Text(session.created, format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
-                    .font(.caption)
-                    .foregroundStyle(Theme.textTertiary)
+                Text("\(session.path) · \(session.windows) window\(session.windows == 1 ? "" : "s")")
+                    .font(Theme.mono)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
             }
-            .padding(14)
-            .card()
-            .contentShape(Rectangle())
+            Spacer(minLength: 8)
+            Text(session.created, format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
+                .font(.caption)
+                .foregroundStyle(Theme.textTertiary)
         }
-        .buttonStyle(.plain)
+        .padding(14)
+        .card()
+        .contentShape(Rectangle())
+        // A tap gesture, not a Button: a Button still fires when a swipe ends, which opened the session.
         .contextMenu {
             Button("Attach", systemImage: "arrow.right.circle", action: onAttach)
             Button("Kill session", systemImage: "xmark.circle", role: .destructive, action: onKill)
@@ -426,9 +425,10 @@ struct SessionRow: View {
 }
 
 /// Slides a row left to show a red delete button behind it. Tapping the button calls `onDelete`.
-/// Vertical drags are ignored, so the list still scrolls.
+/// A tap on the row calls `onTap`, or closes the row when it is open. Vertical drags are ignored, so the list still scrolls.
 struct SwipeToDelete<Content: View>: View {
     var onDelete: () -> Void
+    var onTap: () -> Void = {}
     @ViewBuilder var content: () -> Content
 
     private let buttonWidth: CGFloat = 72
@@ -453,14 +453,10 @@ struct SwipeToDelete<Content: View>: View {
             .opacity(offset < 0 ? 1 : 0)
 
             content()
-                .overlay {
-                    if isOpen {
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onTapGesture { settle(to: 0) }
-                    }
-                }
                 .offset(x: offset)
+                .onTapGesture {
+                    if isOpen { settle(to: 0) } else { onTap() }
+                }
                 .simultaneousGesture(swipe)
         }
     }
