@@ -1,0 +1,62 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Kessik: Claude Code on your Mac, from your iPhone">
+  <section>
+    <h1>Claude Code on your Mac, from your iPhone.</h1>
+    <p class="lede">
+      Kessik opens Claude Code on your Mac over SSH. Every session starts inside tmux, so it keeps
+      running when your phone locks, loses signal or closes the terminal. Attach to the same session
+      later and carry on.
+    </p>
+    <div class="badges">
+      <a class="button" href="https://apps.apple.com/app/kessik/id6823446723">Download on the App Store</a>
+      <a class="button ghost" href="/support">Get help</a>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h3>Sessions that stay alive</h3>
+      <p>New Claude sessions start in tmux. Picking the same folder again attaches to the session that already exists.</p>
+    </div>
+    <div class="card">
+      <h3>A real terminal</h3>
+      <p>A key bar adds esc, ctrl, tab, arrows and shell symbols. Swipe to scroll history. Pinch to resize text.</p>
+    </div>
+    <div class="card">
+      <h3>Buttons for prompts</h3>
+      <p>When Claude Code shows a numbered menu, such as a permission prompt, Kessik shows one button for each option.</p>
+    </div>
+    <div class="card">
+      <h3>Photos and ports</h3>
+      <p>Send a photo to the Mac for a Claude prompt. Preview a dev server port from your Mac in Safari inside the app.</p>
+    </div>
+    <div class="card">
+      <h3>Keys stay on the phone</h3>
+      <p>Use an ed25519 key made in the app or a password. Both are kept in the iPhone Keychain. Host key changes stop the connection.</p>
+    </div>
+    <div class="card">
+      <h3>Reach it anywhere</h3>
+      <p>Find Macs on your Wi-Fi with Bonjour, or switch to the Tailscale address to connect on any network.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What you need on the Mac</h2>
+    <ol>
+      <li>Remote Login turned on in System Settings, General, Sharing.</li>
+      <li>tmux, installed with <code>brew install tmux</code>.</li>
+      <li>Claude Code, signed in once by running <code>claude</code> in Terminal.</li>
+    </ol>
+    <p>Kessik needs an iPhone with iOS 17 or later. Tailscale is optional. Four guides in the app cover each step.</p>
+  </section>
+
+  <section>
+    <h2>No server, no tracking</h2>
+    <p>
+      Kessik has no server of its own and collects no data. It connects only to the Mac you choose.
+      Read the <a href="/privacy">privacy policy</a>.
+    </p>
+  </section>
+</Base>
