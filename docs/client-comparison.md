@@ -1,4 +1,4 @@
-# Echo, Termius and Blink compared with SSHTerm
+# Echo, Termius and Blink compared with Kessik
 
 Source: public pages read on 2026-10-15, and Echo's product and help pages and Termius's agent tips read again on 2026-10-16 (developer sites, help centers and App Store listings, linked at the end). None of the three apps was installed or tested. "Not documented" means the public pages do not say, so the feature may still exist.
 
@@ -8,7 +8,7 @@ The plan asked two things about these apps: do they save hosts, and do they supp
 
 All three save hosts. Echo keeps a server list where each entry has a type (ssh or mosh), a `user@hostname[:port]` target and an optional nickname. Termius Starter saves hosts and groups in a local vault, and only the paid Pro plan syncs them. Blink saves an alias, hostname, port, user, password and key per host, plus a raw `ssh_config` field and Mosh options.
 
-None of the three has a tmux interface. Each one treats tmux as something the user types inside the shell. Echo's launch post describes the workflow as SSH in, then attach to a tmux session. Termius suggests a per-host startup command such as `tmux attach -t <name>` or `cd ~/my-project && claude`. Blink's Mosh page suggests tmux inside Mosh to keep scrollback. So SSHTerm's tmux session list and new Claude session picker have no match in these three apps. The closest app found is Attach, a separate App Store app that is a native tmux client for Claude Code and Codex and has no local terminal emulation.
+None of the three has a tmux interface. Each one treats tmux as something the user types inside the shell. Echo's launch post describes the workflow as SSH in, then attach to a tmux session. Termius suggests a per-host startup command such as `tmux attach -t <name>` or `cd ~/my-project && claude`. Blink's Mosh page suggests tmux inside Mosh to keep scrollback. So Kessik's tmux session list and new Claude session picker have no match in these three apps. The closest app found is Attach, a separate App Store app that is a native tmux client for Claude Code and Codex and has no local terminal emulation.
 
 | | Echo | Termius Starter | Blink |
 |---|---|---|---|
@@ -26,9 +26,9 @@ None of the three has a tmux interface. Each one treats tmux as something the us
 
 Echo needs iOS 26 or later. It uses Ghostty's terminal engine.
 
-## Behaviors SSHTerm could add
+## Behaviors Kessik could add
 
-Termius published eight tips for running coding agents on a phone in May 2026. Some of them, and some of Echo's keyboard behavior, match gaps in SSHTerm. The plan says not to copy another app's UI or branding, and these are behaviors described in public docs, so they fall inside that rule.
+Termius published eight tips for running coding agents on a phone in May 2026. Some of them, and some of Echo's keyboard behavior, match gaps in Kessik. The plan says not to copy another app's UI or branding, and these are behaviors described in public docs, so they fall inside that rule.
 
 1. A Shift+Tab key. Claude Code uses Shift+Tab to cycle its modes (default, accept edits, plan). Added on 2026-10-15: the key after Tab on the key bar sends `ESC [ Z`.
 2. Drag gestures for arrow keys. Termius moves up and down with a long press and drag, and left and right by holding Space and dragging. Echo has a similar gesture. This helps in Claude Code's menus. Added: a drag pad on the key bar sends one arrow key for each 18 points of travel. The system keyboard's Space bar is not open to apps, so the Space drag is not possible.
@@ -45,7 +45,7 @@ Termius published eight tips for running coding agents on a phone in May 2026. S
 12. Cursor style. Echo's help page lists a cursor style setting. Added on 2026-10-16: Settings > Appearance sets the cursor to Block, Bar or Underline, and turns blink on or off.
 13. A pasted `ssh` line. Echo's help page says a pasted `ssh user@hostname` line loses its `ssh` prefix. Added on 2026-10-16: a line pasted into the Mac's hostname field, with `-p`, `-l` or `-J`, or as an `ssh://` URL, fills the hostname, username, port and jump host.
 
-Termius's help center confirms the background limit that SSHTerm already plans around. iOS stops background network activity within 20 to 30 seconds, and tmux plus a fast reattach is the answer all three give for plain SSH. Only Mosh keeps the view itself alive, and Mosh waits for a later SSHTerm version.
+Termius's help center confirms the background limit that Kessik already plans around. iOS stops background network activity within 20 to 30 seconds, and tmux plus a fast reattach is the answer all three give for plain SSH. Only Mosh keeps the view itself alive, and Mosh waits for a later Kessik version.
 
 ## Notes for the light theme decision
 
