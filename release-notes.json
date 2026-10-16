@@ -9,8 +9,8 @@
       "changes": [
         {
           "kind": "new",
-          "title": "Sessions that keep running",
-          "detail": "Every Claude Code session starts inside tmux on the Mac. A locked phone, a dead zone or a closed app does not stop it. Pick the same folder again and Kessik attaches to the session that is already there, and Reconnect returns to it after a dropped connection."
+          "title": "Start Claude without opening it",
+          "detail": "New Claude session starts Claude Code on the Mac in the background and does not open it. A card then asks you to open the Claude app, to control the session from your phone, or to open the terminal in Kessik. Every session runs inside tmux, so a locked phone, a dead zone or a closed app does not stop it, and Reconnect returns to it after a dropped connection."
         },
         {
           "kind": "new",
@@ -55,7 +55,7 @@
         {
           "kind": "new",
           "title": "A start command for each Mac",
-          "detail": "A Mac can have its own Start command, such as codex or claude --model opus. New Claude session runs it in the tmux session in place of claude --remote-control."
+          "detail": "A Mac can have its own Start command, such as codex or claude --model opus. New Claude session runs it in the tmux session in place of claude --remote-control, and opens the terminal at once."
         },
         {
           "kind": "new",

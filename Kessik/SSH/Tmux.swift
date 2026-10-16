@@ -35,6 +35,48 @@ enum Tmux {
         return "exec tmux new -A -s \(quote(name)) -c \(quote(path)) \(run)" + mouseOn(name)
     }
 
+    static let startedMarker = "__KESSIK_STARTED__"
+    static let runningMarker = "__KESSIK_RUNNING__"
+    static let exitedMarker = "__KESSIK_EXITED__"
+
+    /// Starts a Claude session with Remote Control on, in the background, so the phone does not attach to it.
+    /// A session with this name that exists is left as it is. The whole script runs in the Mac's own
+    /// login shell with `-i`, because a plain SSH command has no `~/.local/bin` or other `PATH` entries
+    /// from `.zshrc`, and the tmux server it may start would keep that short `PATH` for every later
+    /// session. After one second the script checks that the session is still there, because tmux
+    /// reports success for a session whose command ends at once, such as a missing `claude`.
+    static func startDetachedCommand(name: String, path: String) -> String {
+        #""${SHELL:-/bin/sh}" -ilc "# + quote(startDetachedScript(name: name, path: path))
+    }
+
+    /// What the login shell runs, apart from the shell that wraps it.
+    static func startDetachedScript(name: String, path: String) -> String {
+        let target = quote("=" + name)
+        return "command -v tmux >/dev/null 2>&1 || { echo \(noTmuxMarker); exit 0; }; "
+            + "if tmux has-session -t \(target) 2>/dev/null; then echo \(runningMarker); else "
+            + "tmux new-session -d -s \(quote(name)) -c \(quote(path)) claude --remote-control \(quote(name)); "
+            + "sleep 1; if tmux has-session -t \(target) 2>/dev/null; then echo \(startedMarker); "
+            + "else echo \(exitedMarker); fi; fi"
+    }
+
+    enum StartResult: Equatable {
+        case started
+        case alreadyRunning
+        /// tmux made the session and its command ended at once, so `claude` is probably not installed.
+        case exitedAtOnce
+        case noTmux
+    }
+
+    /// Reads the output of `startDetachedCommand`. An interactive shell may print other lines first, so
+    /// this looks for the markers. Nil when none is there.
+    static func parseStart(_ output: String) -> StartResult? {
+        if output.contains(noTmuxMarker) { return .noTmux }
+        if output.contains(runningMarker) { return .alreadyRunning }
+        if output.contains(startedMarker) { return .started }
+        if output.contains(exitedMarker) { return .exitedAtOnce }
+        return nil
+    }
+
     /// Runs after the attach. With `mouse on`, a swipe on the phone scrolls tmux's history. It is a
     /// session option, so a Mac terminal on the same session gets it too; other sessions keep theirs.
     /// The target needs the trailing `:`, or tmux reads `=name` as a pane and finds no session.

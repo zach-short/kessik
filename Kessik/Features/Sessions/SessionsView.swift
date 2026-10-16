@@ -7,8 +7,14 @@ struct SessionLaunch: Identifiable {
     var command: String
     var title: String
     var tmuxName: String?
-    /// A new Claude session starts with Remote Control on. The terminal then points to the Claude app.
-    var remoteControl = false
+}
+
+/// A Claude session that is running on the Mac, waiting for the user to pick the Claude app or the terminal.
+struct ReadySession: Identifiable {
+    let id = UUID()
+    var name: String
+    /// True when the session was already there, so nothing new started.
+    var alreadyRunning: Bool
 }
 
 struct SessionsView: View {
@@ -20,6 +26,10 @@ struct SessionsView: View {
     @State private var loading = false
     @State private var showPicker = false
     @State private var launch: SessionLaunch?
+    /// The folder name of a session that is starting in the background.
+    @State private var starting: String?
+    @State private var ready: ReadySession?
+    @State private var startError: String?
     @State private var pendingKill: TmuxSession?
     @State private var pendingSnippet: Snippet?
 
@@ -56,17 +66,35 @@ struct SessionsView: View {
                 FolderPicker(link: link, sessions: store.sessions) { path in
                     showPicker = false
                     let name = Tmux.sessionName(for: path)
-                    // Picking a folder that already has a session attaches to it, so nothing new starts.
-                    let isNew = !store.sessions.contains { $0.name == name }
-                    // A Mac's own start command may not have Remote Control, so only the default shows the card.
-                    let startCommand = link.host.customStartCommand
-                    launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path, startCommand: startCommand),
-                                           title: name, tmuxName: name, remoteControl: isNew && startCommand == nil)
+                    if let startCommand = link.host.customStartCommand {
+                        // A Mac's own start command may not have Remote Control, so there is nothing to open in
+                        // the Claude app. It goes straight to the terminal.
+                        launch = SessionLaunch(command: Tmux.newClaudeCommand(name: name, path: path, startCommand: startCommand),
+                                               title: name, tmuxName: name)
+                    } else {
+                        Task { await start(name: name, path: path) }
+                    }
                 }
             }
             .fullScreenCover(item: $launch, onDismiss: { Task { await refresh() } }) { launch in
-                TerminalScreen(link: link, command: launch.command, title: launch.title, tmuxName: launch.tmuxName,
-                               remoteControl: launch.remoteControl)
+                TerminalScreen(link: link, command: launch.command, title: launch.title, tmuxName: launch.tmuxName)
+            }
+            .sheet(item: $ready) { session in
+                RemoteControlCard(name: session.name, macName: link.host.name, alreadyRunning: session.alreadyRunning) {
+                    ready = nil
+                    RemoteControlCard.openClaude()
+                } onOpenTerminal: {
+                    ready = nil
+                    launch = SessionLaunch(command: Tmux.attachCommand(session.name), title: session.name, tmuxName: session.name)
+                }
+            }
+            .overlay {
+                if let starting { StartingCard(name: starting) }
+            }
+            .alert("Could not start the session", isPresented: Binding(get: { startError != nil }, set: { if !$0 { startError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(startError ?? "")
             }
             .confirmationDialog(
                 "Kill \(pendingKill?.name ?? "")?",
@@ -160,6 +188,31 @@ struct SessionsView: View {
         } catch {
             loadError = "Could not list sessions: \(SSHSession.message(for: error, host: link.host))"
         }
+    }
+
+    /// Starts Claude in a tmux session on the Mac without attaching to it, then offers the Claude app or
+    /// the terminal. A folder that already has a session starts nothing and offers the same two.
+    private func start(name: String, path: String) async {
+        starting = name
+        do {
+            let output = try await link.run(Tmux.startDetachedCommand(name: name, path: path))
+            switch Tmux.parseStart(output) {
+            case .started:
+                ready = ReadySession(name: name, alreadyRunning: false)
+            case .alreadyRunning:
+                ready = ReadySession(name: name, alreadyRunning: true)
+            case .exitedAtOnce:
+                startError = "Claude Code ended as soon as it started on \(link.host.name). Check that `claude` runs in Terminal on the Mac, then try again."
+            case .noTmux:
+                startError = "tmux is not installed on the Mac. Run `brew install tmux` there, then try again."
+            case nil:
+                startError = "The Mac did not say whether the session started. Refresh the list to check."
+            }
+        } catch {
+            startError = "Could not start the session: \(SSHSession.message(for: error, host: link.host))"
+        }
+        starting = nil
+        await refresh()
     }
 
     private func kill(_ session: TmuxSession) async {
@@ -483,6 +536,27 @@ struct SwipeToDelete<Content: View>: View {
     private func delete() {
         settle(to: 0)
         onDelete()
+    }
+}
+
+/// Covers the Sessions tab while a Claude session starts on the Mac, which takes a few seconds.
+private struct StartingCard: View {
+    var name: String
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.4).ignoresSafeArea()
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Starting \(Text(name).font(Theme.mono).bold())")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            .padding(24)
+            .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
+            .background(Theme.background, in: RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

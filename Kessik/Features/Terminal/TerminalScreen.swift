@@ -17,10 +17,6 @@ struct TerminalScreen: View {
     @State private var password = ""
     @State private var replyCount = 0
     @State private var typingReply = false
-    /// A new Claude session starts with Remote Control on. This card points to the Claude app.
-    @State private var showRemoteControl: Bool
-    /// The user picked the Claude app before the terminal was ready. The pick runs once it connects.
-    @State private var openClaudeWhenReady = false
     @FocusState private var passwordFocused: Bool
     @AppStorage(SettingsKey.previewPort) private var previewPort = 3000
     @State private var composing = false
@@ -42,20 +38,17 @@ struct TerminalScreen: View {
         let session = SSHSession(host: host)
         _session = State(initialValue: session)
         _watch = State(initialValue: ScreenWatch(session: session))
-        _showRemoteControl = State(initialValue: false)
         title = nil
         tmuxName = nil
     }
 
     /// Opens a shell on the Sessions tab's connection and types `command` into it. A tmux command
     /// closes the terminal when tmux detaches, and after a drop Reconnect attaches to `tmuxName`
-    /// again. `title` goes in the status line. `remoteControl` is true when `command` starts a
-    /// Claude Code session with Remote Control on, and shows the card that points to the Claude app.
-    init(link: MacLink, command: String, title: String, tmuxName: String?, remoteControl: Bool = false) {
+    /// again. `title` goes in the status line.
+    init(link: MacLink, command: String, title: String, tmuxName: String?) {
         let session = SSHSession(link: link, startCommand: command, tmuxName: tmuxName)
         _session = State(initialValue: session)
         _watch = State(initialValue: ScreenWatch(session: session))
-        _showRemoteControl = State(initialValue: remoteControl)
         self.title = title
         self.tmuxName = tmuxName
     }
@@ -105,10 +98,6 @@ struct TerminalScreen: View {
         .onChange(of: session.state) { _, state in
             // tmux detached or exited: go back to the session list.
             if state == .disconnected, !session.ownsClient { dismiss() }
-            if state == .connected, openClaudeWhenReady {
-                openClaudeWhenReady = false
-                RemoteControlCard.openClaude()
-            }
         }
         .sheet(isPresented: $composing, onDismiss: refocusTerminal) {
             ComposeSheet { text, send in paste(text, send: send) }
@@ -144,29 +133,6 @@ struct TerminalScreen: View {
                 SafariView(url: forward.url).ignoresSafeArea()
             }
         }
-        .sheet(isPresented: remoteControlSheet) {
-            if let title {
-                RemoteControlCard(name: title) {
-                    // Hold the pick until the terminal is ready, or run it now if it already is.
-                    showRemoteControl = false
-                    if session.state == .connected {
-                        RemoteControlCard.openClaude()
-                    } else {
-                        openClaudeWhenReady = true
-                    }
-                } onStay: {
-                    showRemoteControl = false
-                }
-            }
-        }
-    }
-
-    /// The Remote Control sheet opens as soon as the terminal opens, and closes after the user picks.
-    private var remoteControlSheet: Binding<Bool> {
-        Binding(
-            get: { showRemoteControl && title != nil },
-            set: { showRemoteControl = $0 }
-        )
     }
 
     // MARK: Status line
