@@ -168,6 +168,7 @@ struct ConnectCard: View {
     @Environment(\.showTab) private var showTab
     @AppStorage(SettingsKey.rememberPasswords) private var remember = true
     @State private var password = ""
+    @State private var guide: Guide?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -182,6 +183,7 @@ struct ConnectCard: View {
         .onAppear {
             if link.host.isSet { link.connectSavedOnce() }
         }
+        .sheet(item: $guide) { GuideSheet(guide: $0, from: .sessions) }
     }
 
     private var setupPrompt: some View {
@@ -197,6 +199,12 @@ struct ConnectCard: View {
                 Text("Open Settings").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            Button { guide = .connectMac } label: {
+                Text("How to connect to a Mac").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.textPrimary)
             .controlSize(.large)
         }
     }
@@ -225,6 +233,8 @@ struct ConnectCard: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.warning)
                 .fixedSize(horizontal: false, vertical: true)
+            Button("Connection help") { guide = .connectMac }
+                .font(.subheadline)
         }
         SecureField("Password", text: $password)
             .textContentType(.password)
