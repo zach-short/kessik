@@ -20,11 +20,17 @@ const keys = [
 
 const features = [
   { t: 'Buttons for prompts', d: 'When Claude Code shows a numbered menu, such as a permission prompt, Kessik shows one button for each option.' },
-  { t: 'Every Mac you have', d: 'Save several Macs, give each one a name and switch between them with one tap.' },
+  { t: 'Write or dictate a prompt', d: 'The pencil key opens a text box for a long or dictated prompt. It goes into the terminal as one paste, so a new line does not send it early.' },
   { t: 'Replies and snippets', d: 'One-tap replies sit above the terminal. Saved commands wait in the Sessions tab. Export and import them as JSON.' },
-  { t: 'Photos and ports', d: 'Send a photo to the Mac for a Claude prompt. Preview a dev server port from the Mac in Safari inside the app.' },
-  { t: 'Your colors, your font', d: 'Six terminal themes, or import an iTerm2 .itermcolors file. Four bundled mono fonts, or add your own.' },
+  { t: 'Send photos and files', d: 'Send a photo or any file, up to 100 MB, to the Mac for a Claude prompt. Kessik types the path for you.' },
+  { t: 'Preview a port', d: 'Forward a dev server port from the Mac and open it in Safari inside the app.' },
+  { t: 'Search the scrollback', d: 'Search the last 10,000 lines of the tmux session. Each match shows with the lines around it, and a tap copies the line.' },
+  { t: 'Every Mac you have', d: 'Save several Macs, give each one a name and switch between them with one tap. Paste an ssh line and Kessik fills in the host, user and port.' },
+  { t: 'Jump hosts', d: 'Reach a Mac through another one, like ssh -J. Set it once for each Mac, and Kessik checks the host key of every hop.' },
+  { t: 'A start command for each Mac', d: 'Run codex, or claude with your own flags, in place of the default. Each Mac keeps its own command.' },
   { t: 'Home or away', d: 'Find Macs on your Wi-Fi with Bonjour. Away from home, connect through Tailscale on any network.' },
+  { t: 'Your colors, your font', d: 'Six terminal themes, or import an iTerm2 .itermcolors file, and give each Mac its own. Four bundled mono fonts, or add your own, with a block, bar or underline cursor.' },
+  { t: 'Guides in the app', d: 'Four guides cover connecting, logging in without a password, setting up Claude Code and using the terminal. Each ends with fixes for the errors the app shows.' },
 ];
 ---
 <Base>
@@ -113,7 +119,7 @@ const features = [
     <div class="card panel" data-reveal style="--d: .1s">
       <div class="eyebrow green">Security</div>
       <h2 class="display">Your keys stay on the phone.</h2>
-      <p>Make an ed25519 key in the app or use a password. Both live in the iPhone Keychain, and Face ID can guard them before each login. If a Mac's host key changes, Kessik stops.</p>
+      <p>Make an ed25519 key in the app, import your own ed25519 or ECDSA key, or make a Secure Enclave key whose private half never leaves the chip and asks for Face ID at each login. Saved passwords live in the iPhone Keychain. If a Mac's host key changes, Kessik stops.</p>
       <a class="btn" href="/support/">Support</a>
     </div>
   </section>

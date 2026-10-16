@@ -100,6 +100,16 @@ struct SettingsView: View {
                 PasswordsSection()
                 LoginLockSection()
 
+                Section {
+                    NavigationLink {
+                        ChangelogView()
+                    } label: {
+                        Label("Changelog", systemImage: "list.bullet.rectangle")
+                    }
+                } footer: {
+                    Text("What changed in each version of Kessik.")
+                }
+
                 Section("Guides") {
                     ForEach(Guide.all) { guide in
                         NavigationLink {

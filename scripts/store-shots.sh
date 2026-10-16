@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Renders design/store/board.html into App Store screenshots.
+#
+#   ./scripts/store-shots.sh            # ten 1320x2868 frames + the panorama
+#   ./scripts/store-shots.sh 3          # just frame 3, while iterating
+#
+# Output lands in build/store-shots/ (gitignored). Upload the .jpg files: App Store Connect
+# rejects images with an alpha channel, which Chrome's PNGs carry.
+#
+# Ported from ~/Projects/furlough/scripts/store-shots.sh, without the iPad slot: Kessik is an
+# iPhone app. A frame with no capture in design/store/raw/ draws a placeholder, and a
+# placeholder must never be uploaded, so the script says which frames still have one.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+BOARD="file://$ROOT/design/store/board.html"
+RAW="$ROOT/design/store/raw"
+OUT="$ROOT/build/store-shots"
+W=1320; H=2868
+
+[ -x "$CHROME" ] || { echo "Google Chrome not found at $CHROME" >&2; exit 1; }
+mkdir -p "$OUT"
+
+shoot() { # <name> <width> <height> <query>
+  "$CHROME" --headless --disable-gpu --hide-scrollbars \
+    --allow-file-access-from-files --force-device-scale-factor=1 \
+    --virtual-time-budget=4000 --window-size="$2,$3" \
+    --screenshot="$OUT/$1.png" "$BOARD?f=$4" >/dev/null 2>&1
+  echo "  $1.png  $(sips -g pixelWidth -g pixelHeight "$OUT/$1.png" | awk '/pixel/{printf "%s ", $2}')"
+}
+
+if [ $# -gt 0 ]; then
+  echo "Rendering frame $1"
+  shoot "$(printf '%02d' "$1")" $W $H "$1"
+else
+  echo "Rendering ten frames"
+  for f in $(seq 1 10); do shoot "$(printf '%02d' $f)" $W $H "$f"; done
+  echo "Rendering the panorama (review only, not for upload)"
+  shoot panorama $((W * 10)) $H all
+  echo "Flattening to JPEG for upload"
+  for f in $(seq -w 1 10); do
+    sips -s format jpeg -s formatOptions 100 "$OUT/$f.png" --out "$OUT/$f.jpg" >/dev/null
+  done
+fi
+
+missing=()
+for f in $(seq -w 1 10); do [ -f "$RAW/$f.png" ] || missing+=("$f"); done
+if [ ${#missing[@]} -gt 0 ]; then
+  echo "NOT READY TO UPLOAD: no capture yet for frame(s) ${missing[*]} (design/store/raw/NN.png)." >&2
+fi
+echo "Done: $OUT"

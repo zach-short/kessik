@@ -1,0 +1,352 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kessik: App Store panorama</title>
+<style>
+  /* Local font so renders are deterministic offline. Chrome needs
+     --allow-file-access-from-files to load it over file://. */
+  @font-face { font-family: 'GeistMono'; font-weight: 100 900;
+    src: url('../../Kessik/Resources/Fonts/GeistMono/GeistMono.ttf'); }
+
+  /* Colors are the site's, which are the app's dark theme (Kessik/Theme/Theme.swift). */
+  :root {
+    --ground: #0C0C0E; --raised: #16161A; --coral: #FF615C; --green: #3DDB85; --amber: #FFC247;
+    --fg: #EBEBEB; --muted: #A1A1AA; --faint: #808089;
+    --mono: 'GeistMono', ui-monospace, 'SF Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+    --frame-w: 1320px; --frame-h: 2868px; --n: 10;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--ground); overflow: hidden; }
+  body { width: var(--frame-w); height: var(--frame-h); }
+  body.all { width: calc(var(--frame-w) * var(--n)); }
+
+  .panorama {
+    position: relative; width: calc(var(--frame-w) * var(--n)); height: var(--frame-h);
+    background: var(--ground);
+    /* One light rig spanning all ten frames: the glows straddle the seams. */
+    background-image:
+      radial-gradient(ellipse 22% 46% at 5% 88%,  rgba(255,97,92,.30), transparent 64%),
+      radial-gradient(ellipse 18% 40% at 24% 8%,  rgba(61,219,133,.10), transparent 62%),
+      radial-gradient(ellipse 16% 38% at 38% 96%, rgba(255,97,92,.16), transparent 60%),
+      radial-gradient(ellipse 20% 44% at 55% 10%, rgba(255,97,92,.18), transparent 64%),
+      radial-gradient(ellipse 16% 38% at 72% 92%, rgba(61,219,133,.10), transparent 60%),
+      radial-gradient(ellipse 22% 48% at 96% 12%, rgba(255,97,92,.22), transparent 64%);
+  }
+  /* The site's wall: a character grid, drawn once across all ten frames. */
+  .wall { position: absolute; inset: 0;
+          background: radial-gradient(rgba(255,255,255,.075) 2px, transparent 3px) 0 0 / 66px 66px;
+          -webkit-mask: linear-gradient(#000, transparent 70%); mask: linear-gradient(#000, transparent 70%); }
+  /* The session line: one arc drawn once across 13200px. The Mac keeps running the whole way. */
+  .stream { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+
+  .frames { position: relative; z-index: 2; display: flex; height: 100%; }
+  .frame { position: relative; width: var(--frame-w); height: var(--frame-h);
+           padding: 210px 96px 0; display: flex; flex-direction: column; }
+  /* Seam guides, only drawn in review mode, never in an exported frame. */
+  body.all .frame + .frame::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: rgba(255,97,92,.28);
+  }
+
+  /* A fixed-height caption block, so every device starts at the same height. */
+  .copy { height: 640px; }
+  .eyebrow { font: 600 32px/1 var(--mono); letter-spacing: .02em; color: var(--coral); margin-bottom: 36px; }
+  .eyebrow.green { color: var(--green); } .eyebrow.amber { color: var(--amber); }
+  h1 { font: 600 98px/1.04 var(--mono); color: var(--fg); letter-spacing: -.055em; max-width: 17ch; }
+  .sub { font: 400 42px/1.42 var(--sans); color: var(--muted); margin-top: 32px; max-width: 27ch; }
+
+  /* The device: each frame sets its own tilt (--ry, --rx, --rz, --ty) so the
+     row reads as one arc, turned furthest at the ends and flat in the middle.
+     The screen is 782x1699, the 1320x2868 capture's own proportions, so a capture is not cropped. */
+  .stage { flex: 1; display: flex; align-items: flex-start; justify-content: center; perspective: 3200px; }
+  .device {
+    position: relative; width: 812px; height: 1729px; border-radius: 96px;
+    background: linear-gradient(148deg, #3A3A40, #18181C 42%, #0A0A0C);
+    padding: 15px; box-shadow: 0 6px 0 rgba(255,255,255,.10) inset,
+      0 120px 190px rgba(0,0,0,.62), 0 0 190px rgba(255,97,92,.16);
+    transform-style: preserve-3d;
+    transform: rotateY(var(--ry)) rotateX(var(--rx)) rotateZ(var(--rz)) translateY(var(--ty));
+  }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 82px;
+            overflow: hidden; background: var(--ground); }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%;
+                object-fit: cover; z-index: 2; }
+
+  /* Placeholder shown until design/store/raw/NN.png exists. A placeholder must never be uploaded. */
+  .mock { position: absolute; inset: 0; padding: 150px 44px 56px;
+          background-image: radial-gradient(ellipse 80% 40% at 30% 104%, rgba(255,97,92,.22), transparent 62%); }
+  .mt { font: 600 62px/1.1 var(--mono); color: var(--fg); letter-spacing: -.05em; }
+  .mn { font: 400 30px/1.4 var(--sans); color: var(--faint); margin-top: 12px; }
+  .ph { position: absolute; bottom: 54px; left: 0; right: 0; text-align: center;
+        font: 500 24px var(--mono); color: var(--faint); letter-spacing: .08em; }
+
+  .term { margin-top: 44px; padding: 36px 34px; border-radius: 30px; background: rgba(255,255,255,.04);
+          border: 1px solid rgba(255,255,255,.09); font: 500 30px/1.7 var(--mono); color: var(--fg); }
+  .term .dim { color: var(--faint); } .term .coral { color: var(--coral); } .term .ok { color: var(--green); }
+  .term .add { color: var(--green); } .term .del { color: var(--coral); }
+  .row { display: flex; align-items: center; gap: 26px; margin-top: 30px;
+         padding: 30px 32px; border-radius: 30px; background: rgba(255,255,255,.05);
+         border: 1px solid rgba(255,255,255,.10); }
+  .row.lit { background: rgba(255,97,92,.14); border-color: rgba(255,97,92,.5); }
+  .dot { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--green); box-shadow: 0 0 14px rgba(61,219,133,.6); }
+  .dot.coral { background: var(--coral); box-shadow: 0 0 14px rgba(255,97,92,.6); }
+  .dot.faint { background: var(--faint); box-shadow: none; }
+  .rowtext { font: 600 32px/1.2 var(--sans); color: var(--fg); }
+  .rowsub { font: 500 24px/1.3 var(--mono); color: var(--faint); margin-top: 6px; }
+  .rowmeta { margin-left: auto; font: 500 26px var(--mono); color: var(--faint); white-space: nowrap; }
+  .btn { margin-top: 26px; padding: 34px 34px; border-radius: 26px; background: rgba(255,255,255,.07);
+         border: 1px solid rgba(255,255,255,.14); font: 500 32px/1.3 var(--sans); color: var(--fg); }
+  .btn b { font: 600 30px var(--mono); color: var(--coral); margin-right: 20px; }
+  .btn.lit { background: rgba(255,97,92,.16); border-color: rgba(255,97,92,.55); }
+  .keys { display: flex; flex-wrap: wrap; gap: 14px; }
+  .keys span { min-width: 78px; height: 78px; padding: 0 18px; display: grid; place-items: center; border-radius: 18px;
+               background: #26262B; font: 500 30px var(--mono); color: var(--fg); }
+  .keys span.on { outline: 2px solid var(--coral); box-shadow: 0 0 22px rgba(255,97,92,.5); }
+  .dock { position: absolute; left: 44px; right: 44px; bottom: 150px; padding: 26px; border-radius: 34px;
+          background: var(--raised); border: 1px solid rgba(255,255,255,.1); }
+  .field { margin-top: 36px; padding: 34px 36px; border-radius: 28px; background: rgba(255,255,255,.07);
+           border: 1px solid rgba(255,255,255,.16); font: 500 32px/1.5 var(--mono); color: var(--fg); }
+  .field.tall { min-height: 460px; }
+  .field::after { content: ''; display: inline-block; width: 4px; height: 36px; background: var(--coral);
+                  vertical-align: -6px; margin-left: 6px; }
+  .pair { display: flex; gap: 22px; margin-top: 30px; }
+  .pair .btn { flex: 1; margin-top: 0; text-align: center; }
+  .pair .btn.go { background: var(--coral); border-color: transparent; color: #140504; font-weight: 600; }
+  mark { background: rgba(255,194,71,.28); color: var(--amber); border-radius: 6px; padding: 0 4px; }
+  .url { margin-top: 36px; padding: 26px 32px; border-radius: 999px; background: rgba(255,255,255,.08);
+         font: 500 30px var(--mono); color: var(--fg); text-align: center; }
+  .page { margin-top: 30px; height: 900px; border-radius: 30px; background: rgba(255,255,255,.95);
+          display: grid; place-items: center; font: 600 54px var(--sans); color: #17171B; }
+  .keyicon { display: block; margin: 70px auto 0; }
+</style>
+
+<div class="panorama">
+  <div class="wall"></div>
+  <svg class="stream" viewBox="0 0 13200 2868" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="line" x1="0" x2="1">
+        <stop offset="0"   stop-color="#FF615C" stop-opacity="0"/>
+        <stop offset=".16" stop-color="#FF615C" stop-opacity=".85"/>
+        <stop offset=".50" stop-color="#3DDB85" stop-opacity=".9"/>
+        <stop offset=".86" stop-color="#FF615C" stop-opacity=".7"/>
+        <stop offset="1"   stop-color="#FF615C" stop-opacity="0"/>
+      </linearGradient>
+      <filter id="soft"><feGaussianBlur stdDeviation="26"/></filter>
+    </defs>
+    <path d="M-100 1980 C 800 1660, 1750 2320, 2620 1980 S 4180 1520, 5080 1840 S 6250 2260, 6820 1960 S 7620 1580, 8300 1900 S 9300 2300, 9900 1960 S 10800 1560, 11500 1880 S 12500 2280, 13300 1900"
+          fill="none" stroke="url(#line)" stroke-width="46" filter="url(#soft)" opacity=".5"/>
+    <path d="M-100 1980 C 800 1660, 1750 2320, 2620 1980 S 4180 1520, 5080 1840 S 6250 2260, 6820 1960 S 7620 1580, 8300 1900 S 9300 2300, 9900 1960 S 10800 1560, 11500 1880 S 12500 2280, 13300 1900"
+          fill="none" stroke="url(#line)" stroke-width="5"/>
+  </svg>
+
+  <div class="frames">
+    <!-- 1. The terminal with Claude Code running -->
+    <section class="frame" style="--ry:18deg; --rx:5deg; --rz:-1.7deg; --ty:0px">
+      <div class="copy">
+        <div class="eyebrow">ssh &rarr; tmux &rarr; claude</div>
+        <h1>Claude Code, from your iPhone.</h1>
+        <p class="sub">Kessik opens Claude Code on your Mac over SSH. No server, no account.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/01.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">kessik</div>
+          <div class="term">
+            <div class="dim">~/Projects/kessik</div>
+            <div><span class="coral">&gt;</span> add a dark mode toggle to settings</div>
+            <div class="ok">&#9679; Read(SettingsView.swift)</div>
+            <div class="ok">&#9679; Update(SettingsView.swift)</div>
+            <div class="add">&nbsp; + Toggle("Dark mode", isOn: $dark)</div>
+            <div class="del">&nbsp; - // TODO: appearance</div>
+          </div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/01.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 2. The Sessions tab: tmux sessions on the Mac -->
+    <section class="frame" style="--ry:14deg; --rx:4.2deg; --rz:-1.3deg; --ty:-20px">
+      <div class="copy">
+        <div class="eyebrow green">tmux, on by default</div>
+        <h1>Lock the phone. The work goes on.</h1>
+        <p class="sub">Every session runs in tmux on the Mac. Come back later and attach to the same one.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/02.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">Sessions</div>
+          <div class="mn">Running on the Mac, newest first.</div>
+          <div class="row"><span class="dot"></span><div><div class="rowtext">kessik</div><div class="rowsub">~/Projects/kessik</div></div><span class="rowmeta">3h</span></div>
+          <div class="row"><span class="dot"></span><div><div class="rowtext">api</div><div class="rowsub">~/Projects/api</div></div><span class="rowmeta">1d</span></div>
+          <div class="row"><span class="dot"></span><div><div class="rowtext">site</div><div class="rowsub">~/Projects/site</div></div><span class="rowmeta">2d</span></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/02.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 3. A Claude Code menu as buttons -->
+    <section class="frame" style="--ry:10deg; --rx:3.4deg; --rz:-.9deg; --ty:-41px">
+      <div class="copy">
+        <div class="eyebrow">Menus</div>
+        <h1>Tap the option, not the number.</h1>
+        <p class="sub">When Claude asks, Kessik shows one button for each choice.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/03.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">Do you want to make this edit?</div>
+          <div class="btn lit"><b>1</b>Yes</div>
+          <div class="btn"><b>2</b>Yes, allow all edits during this session</div>
+          <div class="btn"><b>3</b>No, and tell Claude what to do differently</div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/03.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 4. The key bar -->
+    <section class="frame" style="--ry:6deg; --rx:2.7deg; --rz:-.6deg; --ty:-61px">
+      <div class="copy">
+        <div class="eyebrow">The key bar</div>
+        <h1>The keys a phone forgot.</h1>
+        <p class="sub">esc, ctrl, Tab, Shift-Tab and the arrows, plus the shell symbols you pick.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/04.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="term"><div class="dim">~/Projects/kessik</div><div><span class="coral">&gt;</span> <span class="dim">plan mode on</span></div></div>
+          <div class="dock">
+            <div class="keys"><span>esc</span><span>ctrl</span><span>&#8677;</span><span class="on">&#8676;</span><span>&larr;</span><span>&uarr;</span><span>&darr;</span><span>&rarr;</span><span>|</span><span>~</span><span>/</span><span>-</span></div>
+          </div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/04.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 5. The prompt box -->
+    <section class="frame" style="--ry:2deg; --rx:1.9deg; --rz:-.2deg; --ty:-82px">
+      <div class="copy">
+        <div class="eyebrow">The prompt box</div>
+        <h1>Dictate it. Send it once.</h1>
+        <p class="sub">A long or spoken prompt goes in as one paste, so a new line never sends it early.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/05.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">Write a prompt</div>
+          <div class="field tall">Add a Settings screen with a dark mode toggle. Keep the code style of the other screens, and add a unit test.</div>
+          <div class="pair"><div class="btn">Insert</div><div class="btn go">Send</div></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/05.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 6. The terminal tools menu: image and file -->
+    <section class="frame" style="--ry:-2deg; --rx:1.9deg; --rz:.2deg; --ty:-82px">
+      <div class="copy">
+        <div class="eyebrow">Send</div>
+        <h1>Photos and files, to the Mac.</h1>
+        <p class="sub">Send an image or any file. Kessik types its path into your prompt.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/06.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">kessik</div>
+          <div class="term">
+            <div class="dim">~/Projects/kessik</div>
+            <div><span class="coral">&gt;</span> look at /tmp/kessik/20261016-photo.jpg</div>
+            <div class="ok">&#9679; Read(photo.jpg)</div>
+          </div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/06.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 7. Preview a port in Safari inside the app -->
+    <section class="frame" style="--ry:-6deg; --rx:2.7deg; --rz:.6deg; --ty:-61px">
+      <div class="copy">
+        <div class="eyebrow green">Preview</div>
+        <h1>See the dev server on the phone.</h1>
+        <p class="sub">Forward a port from the Mac and open it in Safari inside the app.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/07.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="url">localhost:3000</div>
+          <div class="page">Hello from the Mac</div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/07.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 8. Search the scrollback -->
+    <section class="frame" style="--ry:-10deg; --rx:3.4deg; --rz:.9deg; --ty:-41px">
+      <div class="copy">
+        <div class="eyebrow">Scrollback</div>
+        <h1>Search the last 10,000 lines.</h1>
+        <p class="sub">Find a command or an error in the tmux history. A tap copies the line.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/08.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">Search</div>
+          <div class="field">error</div>
+          <div class="mn">3 matches</div>
+          <div class="term"><div class="dim">npm run build</div><div>Build <mark>error</mark>: missing export</div><div class="dim">npm test</div></div>
+          <div class="term"><div class="dim">git push</div><div>remote: <mark>error</mark>: refusing to update</div><div class="dim">git status</div></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/08.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 9. Several Macs, with a jump host -->
+    <section class="frame" style="--ry:-14deg; --rx:4.2deg; --rz:1.3deg; --ty:-20px">
+      <div class="copy">
+        <div class="eyebrow">Your Macs</div>
+        <h1>Every Mac, its own setup.</h1>
+        <p class="sub">Save several Macs. Each has its own colors, start command and jump host.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/09.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">Studio</div>
+          <div class="row"><span class="rowtext">Hostname</span><span class="rowmeta">studio.tailnet.ts.net</span></div>
+          <div class="row"><span class="rowtext">Terminal colors</span><span class="rowmeta">Tokyo Night</span></div>
+          <div class="row lit"><span class="rowtext">Start command</span><span class="rowmeta">codex</span></div>
+          <div class="row"><span class="rowtext">Jump host</span><span class="rowmeta">bastion &rsaquo;</span></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/09.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- 10. Keys and Face ID -->
+    <section class="frame" style="--ry:-18deg; --rx:5deg; --rz:1.7deg; --ty:0px">
+      <div class="copy">
+        <div class="eyebrow">Security</div>
+        <h1>Keys that never leave the phone.</h1>
+        <p class="sub">A Secure Enclave key stays on the iPhone and asks for Face ID at each login.</p>
+      </div>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/10.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="mt">SSH key</div>
+          <svg class="keyicon" width="260" height="260" viewBox="0 0 260 260" fill="none" stroke="#FF615C" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="92" cy="130" r="52"/><path d="M144 130h92M204 130v36M236 130v24"/>
+          </svg>
+          <div class="row"><span class="dot"></span><span class="rowtext">Secure Enclave key</span><span class="rowmeta">Face ID</span></div>
+          <div class="row"><span class="dot"></span><span class="rowtext">Saved passwords</span><span class="rowmeta">Keychain</span></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/10.png</div>
+        </div>
+      </div></div></div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // ?f=1..10 renders one frame; ?f=all renders the whole panorama.
+  const params = new URLSearchParams(location.search);
+  const f = params.get('f') || 'all';
+  const frameW = 1320;
+  const pan = document.querySelector('.panorama');
+  if (f === 'all') { document.body.classList.add('all'); }
+  else { pan.style.marginLeft = (-frameW * (parseInt(f, 10) - 1)) + 'px'; }
+</script>

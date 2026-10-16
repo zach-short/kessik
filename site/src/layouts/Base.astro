@@ -49,6 +49,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
           Kessik
         </a>
         <nav aria-label="Site">
+          <a class="hide-sm" href="/changelog/" aria-current={path === '/changelog' ? 'page' : undefined}>Changelog</a>
           <a href="/support/" aria-current={path === '/support' ? 'page' : undefined}>Support</a>
           <a class="hide-sm" href="/privacy/" aria-current={path === '/privacy' ? 'page' : undefined}>Privacy</a>
           <a class="btn primary" href={appStoreURL}>Get the app</a>
@@ -67,6 +68,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
           <p class="line faint">&copy; 2026 Zach Short</p>
         </div>
         <nav class="cols" aria-label="Footer">
+          <a href="/changelog/">Changelog</a>
           <a href="/support/">Support</a>
           <a href="/privacy/">Privacy policy</a>
           <a href="/terms/">Terms of use</a>

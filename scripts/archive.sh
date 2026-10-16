@@ -6,8 +6,9 @@
 #   scripts/archive.sh --upload     …and send it to App Store Connect
 #   BUILD=1234 scripts/archive.sh   pin the build number instead of stamping one
 #
-# Ported from ~/Projects/furlough/scripts/archive.sh, without the Screen Time and release-notes
-# checks that only Furlough needs.
+# Ported from ~/Projects/furlough/scripts/archive.sh, without the Screen Time checks that only
+# Furlough needs. It keeps the release-notes check: the newest entry in release-notes.json must be
+# the version in project.yml.
 #
 # Uploading needs an App Store Connect API key (App Store Connect > Users and Access >
 # Integrations). Export ASC_KEY_ID and ASC_ISSUER_ID, and put the .p8 where altool looks:
@@ -30,6 +31,16 @@ TEAM="$(awk -F' *= *' '/^DEVELOPMENT_TEAM/{print $2}' "$LOCAL")"
 BUILD="${BUILD:-$(date -u +%Y%m%d%H%M)}"
 ARCHIVE="$ROOT/build/Kessik-$BUILD.xcarchive"
 EXPORT="$ROOT/build/export"
+
+echo "==> Checking the version against release-notes.json"
+VERSION="$(grep -m1 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '"')"
+NOTES_VERSION="$(plutil -extract versions.0.version raw -o - release-notes.json 2>/dev/null || true)"
+if [[ "$NOTES_VERSION" != "$VERSION" ]]; then
+    echo "REFUSING TO SHIP: project.yml is at version $VERSION, but the newest entry in release-notes.json is '${NOTES_VERSION:-none}'." >&2
+    echo "Add an entry for $VERSION at the top of release-notes.json, or fix MARKETING_VERSION." >&2
+    exit 1
+fi
+echo "    version $VERSION has release notes"
 
 echo "==> Regenerating the project"
 xcodegen generate --spec project.yml --project .

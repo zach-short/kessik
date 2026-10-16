@@ -1,0 +1,83 @@
+{
+  "$comment": "The one copy of what changed and when. The app bundles it (Kessik/Models/ReleaseNotes.swift) and the site imports it (site/src/pages/changelog.astro), so nothing else may hold a second copy. Newest first. Add an entry here before a version number in project.yml changes: scripts/archive.sh refuses to cut a build for a version with no entry. Dates are yyyy-MM-dd and name the day the version went out. Each change has a kind (new, better or fixed), a short title that names the thing and a detail of one or two sentences.",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "date": "2026-10-16",
+      "headline": "Claude Code on your Mac, from your iPhone.",
+      "lead": "The first version of Kessik. It opens Claude Code on a Mac over SSH and starts every session inside tmux, so the session keeps running when the phone locks.",
+      "changes": [
+        {
+          "kind": "new",
+          "title": "Sessions that keep running",
+          "detail": "Every Claude Code session starts inside tmux on the Mac. A locked phone, a dead zone or a closed app does not stop it. Pick the same folder again and Kessik attaches to the session that is already there, and Reconnect returns to it after a dropped connection."
+        },
+        {
+          "kind": "new",
+          "title": "A key bar for Claude Code",
+          "detail": "esc, ctrl, Tab, Shift-Tab and four arrow keys sit above the keyboard, with up to 16 shell symbols that you choose and order. Drag the arrow pad to move through menus. Swipe up to scroll the tmux history, and pinch to change the text size."
+        },
+        {
+          "kind": "new",
+          "title": "Claude's menus as buttons",
+          "detail": "When Claude Code shows a numbered menu, such as a permission prompt, Kessik reads the screen and shows one button for each option. A tap sends that option's number."
+        },
+        {
+          "kind": "new",
+          "title": "Write or dictate a prompt",
+          "detail": "The pencil key opens a text box for a long or dictated prompt. Insert puts the text into the terminal as one paste, so a new line does not send the prompt early, and Send adds Return."
+        },
+        {
+          "kind": "new",
+          "title": "Replies and snippets",
+          "detail": "Reply chips above the terminal type a saved reply such as continue or yes. Command snippets run in a new terminal on the Mac after the app asks. Both kinds are edited in Settings, and both export and import as a JSON file."
+        },
+        {
+          "kind": "new",
+          "title": "Send a photo or a file",
+          "detail": "Send an image copies a photo to /tmp/kessik on the Mac and types its path, so the image can go into a Claude prompt. A HEIC photo becomes a JPEG on the way. Send a file does the same for any file from Files, up to 100 MB."
+        },
+        {
+          "kind": "new",
+          "title": "Preview a dev server",
+          "detail": "Preview a port forwards a port on the phone to the same port on the Mac over the SSH connection and opens it in Safari inside the app. A dev server that listens only on the Mac shows on the phone."
+        },
+        {
+          "kind": "new",
+          "title": "Search the scrollback",
+          "detail": "Search reads up to the last 10,000 lines of the tmux session. It ignores case, shows a count and highlights each match with the lines around it, and a tap copies the line."
+        },
+        {
+          "kind": "new",
+          "title": "Several Macs",
+          "detail": "Save as many Macs as you like. Each has its own name, terminal colors, start command and jump host, and a tap makes the Sessions tab use it. A pasted line such as ssh -p 2222 me@my-mac fills the hostname, username and port."
+        },
+        {
+          "kind": "new",
+          "title": "A start command for each Mac",
+          "detail": "A Mac can have its own Start command, such as codex or claude --model opus. New Claude session runs it in the tmux session in place of claude --remote-control."
+        },
+        {
+          "kind": "new",
+          "title": "Reach any Mac",
+          "detail": "Kessik finds Macs on your Wi-Fi with Bonjour and offers the Mac's Tailscale address for use away from home. A jump host, set for each Mac by hostname, port and username, lets the phone reach a Mac through another one, like ssh -J. The host key of each hop is checked."
+        },
+        {
+          "kind": "new",
+          "title": "Keys that stay on the phone",
+          "detail": "Make an ed25519 key, or a P-256 key whose private half stays in the Secure Enclave and asks for Face ID at each login. Import an ed25519 or ECDSA OpenSSH key by paste or from Files. A toggle asks for Face ID before any login, and a changed host key stops the connection."
+        },
+        {
+          "kind": "new",
+          "title": "Colors, fonts and cursor",
+          "detail": "Choose a dark, light or system theme, one of six terminal palettes or an iTerm2 color file you import. Four mono fonts are included and you can add your own. The cursor can be a block, a bar or an underline, blinking or still."
+        },
+        {
+          "kind": "new",
+          "title": "Guides in the app",
+          "detail": "Four guides cover connecting to a Mac, logging in without a password, setting up Claude Code and using the terminal. Each ends with fixes for the errors the app shows."
+        }
+      ]
+    }
+  ]
+}

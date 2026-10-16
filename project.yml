@@ -30,7 +30,12 @@ targets:
   Kessik:
     type: application
     platform: iOS
-    sources: [Kessik]
+    sources:
+      - Kessik
+      # What changed in each version. One copy at the root of the repo, bundled here and
+      # imported by the site, so the app and kessik.com cannot disagree about a release.
+      - path: release-notes.json
+        buildPhase: resources
     dependencies:
       - package: SwiftTerm
       - package: Citadel

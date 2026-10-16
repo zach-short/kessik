@@ -48,6 +48,10 @@ In Settings, the app searches the current Wi-Fi for Macs that have Remote Login 
 
 Four guides are built into the app, in Settings > Guides and behind the How to connect button in the Sessions tab. They cover connecting to a Mac, logging in without a password, setting up Claude Code on the Mac and using the terminal. Each guide ends with fixes for the errors the app shows.
 
+### Changelog
+
+Settings > Changelog lists what changed in each version, newest first, and marks the version of the build in hand. The same notes are at [kessik.com/changelog](https://kessik.com/changelog).
+
 ## Requirements
 
 The phone must be an iPhone running iOS 17.0 or later. The app does not target iPad.
@@ -97,6 +101,16 @@ Citadel is pinned to 0.12.0 because version 0.12.1 moved NIOSSH to a third-party
 `Kessik/SSH` holds the connection code: the SSH session, the tmux commands and their parsers, the Keychain wrappers, the host key store, the Bonjour search and the network monitor. `Kessik/Features` holds one folder per screen area: Hosts, Sessions, Terminal, Settings and Guides. `Kessik/Components` holds shared views, and `Kessik/Theme` holds colors and fonts. The guide text lives in `Kessik/Features/Guides/Guides.swift` and must match the labels and error messages the app shows.
 
 The two Lottie files in `Kessik/Resources/Animations` are generated. Edit `Tools/make_animations.py` and run `python3 Tools/make_animations.py` to rewrite them. Do not edit the JSON by hand.
+
+## Release notes
+
+`release-notes.json` at the root of the repository is the one copy of what changed in each version. The app bundles it (`Kessik/Models/ReleaseNotes.swift` reads it) and the site imports it at build time (`site/src/pages/changelog.astro`), so the app and kessik.com cannot disagree. Each version has a headline, a lead paragraph and a list of changes, and each change is `new`, `better` or `fixed`, with a short title and a detail of one or two sentences. Newest version first.
+
+Add the entry before `MARKETING_VERSION` in `project.yml` changes. `scripts/archive.sh` refuses to cut a build when the newest entry is not the version in `project.yml`, and `ReleaseNotesTests` fails the same way. The date is the day the version goes out, so set it when the build ships. The site shows a new entry the next time it deploys.
+
+## App Store screenshots
+
+`design/store/board.html` draws the ten App Store frames: a caption, and a capture inside a tilted device, with one line running behind all ten. The captures are `design/store/raw/01.png` to `10.png`, and a frame with no capture draws a placeholder. `design/store/raw/README.md` says what each capture shows and how to take it. Run `scripts/store-shots.sh` to render the frames to `build/store-shots/` as 1320x2868 JPEG files for upload, or `scripts/store-shots.sh 3` for one frame. The script needs Google Chrome, and it says which frames still have no capture. A placeholder must never be uploaded.
 
 ## Notes
 
