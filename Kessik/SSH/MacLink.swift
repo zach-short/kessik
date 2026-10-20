@@ -35,9 +35,9 @@ final class MacLink {
     private(set) var state: State = .needsPassword
     /// The Mac from Settings. Change it with `use(_:)`.
     private(set) var host: Host
-    /// After a login to a `.local` name: the Mac's Tailscale address, which works away from that Wi-Fi.
+    /// After a login to a Wi-Fi address: the Mac's Tailscale address, which works away from that Wi-Fi.
     private(set) var tailscaleAddress: String?
-    /// After a login to a `.local` name: true when the Mac has no Tailscale address.
+    /// After a login to a Wi-Fi address: true when the Mac has no Tailscale address.
     private(set) var tailscaleMissing = false
 
     @ObservationIgnored private(set) var client: SSHClient?
@@ -155,7 +155,7 @@ final class MacLink {
             }
             // Again on each login until found, so Tailscale installed later shows up. Through a jump
             // host, the jump host resolves the name, so it is not tied to this Wi-Fi.
-            if host.isLocalName, host.jump == nil, tailscaleAddress == nil {
+            if TailscaleAddress.mayBeLanOnly(host.hostname), host.jump == nil, tailscaleAddress == nil {
                 Task { await lookUpTailscale(gen: gen) }
             }
             return client
@@ -168,8 +168,8 @@ final class MacLink {
         }
     }
 
-    /// A `.local` name works only on the Mac's Wi-Fi. Asks the Mac for its Tailscale address, so the
-    /// Sessions tab can offer one that works on any network.
+    /// A `.local` name or a Wi-Fi address works only on the Mac's Wi-Fi. Asks the Mac for its Tailscale
+    /// address, so the Sessions tab can offer one that works on any network.
     private func lookUpTailscale(gen: Int) async {
         guard let output = try? await run(TailscaleAddress.command), gen == generation else { return }
         tailscaleAddress = TailscaleAddress.parse(output)

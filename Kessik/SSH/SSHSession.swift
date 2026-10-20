@@ -272,13 +272,13 @@ final class SSHSession {
                 return message(for: first.error, host: host)
             }
             if error.dnsAError != nil || error.dnsAAAAError != nil {
-                return "\(name) was not found. Check the hostname, and check that Tailscale is running on this phone."
+                return notFound(host)
             }
         }
         if let error = error as? ChannelError {
             switch error {
             case .connectTimeout:
-                return "\(name) did not answer. The Mac can be asleep, offline, or off Tailscale."
+                return "\(name) did not answer. " + reachHint(host, else: "The Mac can be asleep, offline, or off Tailscale.")
             case .ioOnClosedChannel, .alreadyClosed, .eof, .outputClosed, .inputClosed:
                 return "The connection to \(name) closed."
             default:
@@ -290,9 +290,9 @@ final class SSHSession {
             case ECONNREFUSED:
                 return "\(name) refused the connection. Turn on Remote Login in System Settings > General > Sharing."
             case ETIMEDOUT, EHOSTUNREACH, EHOSTDOWN:
-                return "\(name) did not answer. The Mac can be asleep, offline, or off Tailscale."
+                return "\(name) did not answer. " + reachHint(host, else: "The Mac can be asleep, offline, or off Tailscale.")
             case ENETUNREACH, ENETDOWN:
-                return "This phone has no route to \(name). Check that Tailscale is running on this phone."
+                return "This phone has no route to \(name). " + reachHint(host, else: "Check that Tailscale is running on this phone.")
             case ECONNRESET, EPIPE:
                 return "The connection to \(name) was lost. The Mac can be asleep, or the network changed."
             default:
@@ -304,8 +304,19 @@ final class SSHSession {
             return "\(name) refused the connection. Turn on Remote Login in System Settings > General > Sharing."
         }
         if text.contains("NXDOMAIN") || text.contains("nodename nor servname") || text.contains("unknownHost") {
-            return "\(name) was not found. Check the hostname, and check that Tailscale is running on this phone."
+            return notFound(host)
         }
         return "Connection failed: \(text)"
+    }
+
+    private static func notFound(_ host: Host) -> String {
+        "\(host.hostname) was not found. " + reachHint(host, else: "Check the hostname, and check that Tailscale is running on this phone.")
+    }
+
+    /// Tailscale does not carry a `.local` name or a Wi-Fi address, so checking Tailscale cannot help
+    /// one away from the Mac's network. Through a jump host, the jump host reaches the name instead.
+    private static func reachHint(_ host: Host, else hint: String) -> String {
+        guard host.jump == nil, TailscaleAddress.isLanOnly(host.hostname) else { return hint }
+        return "This address works only on the Mac's own network. Away from it, use the Mac's Tailscale address, which the Tailscale app lists."
     }
 }

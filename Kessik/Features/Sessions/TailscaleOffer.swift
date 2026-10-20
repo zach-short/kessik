@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Shown after a login to a Mac found on Wi-Fi. Its `.local` name works on that Wi-Fi only, so this
-/// offers the Mac's Tailscale address, which works on any network. "Not now" hides it for that name.
+/// Shown after a login to an address that works on one network only, such as a `.local` name or a
+/// Wi-Fi address. It offers the Mac's Tailscale address, which works on any network. A Mac saved
+/// with a Wi-Fi address in Tailscale's range gets the offer too. "Not now" hides it for that address.
 struct TailscaleOffer: View {
     @Environment(AppStore.self) private var store
     @Environment(MacLink.self) private var link
@@ -11,8 +12,9 @@ struct TailscaleOffer: View {
     @State private var guide: Guide?
 
     var body: some View {
-        if link.host.isLocalName, dismissed != link.host.hostname {
-            if let address = link.tailscaleAddress {
+        let hostname = link.host.hostname
+        if TailscaleAddress.mayBeLanOnly(hostname), dismissed != hostname {
+            if let address = link.tailscaleAddress, address != hostname {
                 card(icon: "network",
                      title: "Use this Mac away from home",
                      text: "`\(link.host.hostname)` works only on this Wi-Fi. The Mac's Tailscale address, `\(address)`, works on any network while Tailscale is on.") {

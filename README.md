@@ -44,7 +44,7 @@ iOS can end a socket without telling the app. The app checks the connection when
 
 ### Reaching the Mac
 
-In Settings, the app searches the current Wi-Fi for Macs that have Remote Login on, using Bonjour. A `.local` name works on that Wi-Fi only. After a login to such a name, the app asks the Mac for its Tailscale address and offers to switch to it, because that address works on any network while [Tailscale](https://tailscale.com) is on for both devices.
+In Settings, the app searches the current Wi-Fi for Macs that have Remote Login on, using Bonjour. A `.local` name or a private Wi-Fi address, such as `192.168.1.20`, works on that Wi-Fi only. After a login to such an address, the app asks the Mac for its Tailscale address and offers to switch to it, because that address works on any network while [Tailscale](https://tailscale.com) is on for both devices. The app reads the address from the Tailscale command line tool, or from the Mac's `utun` interfaces when the tool does not answer. Some networks, such as campus Wi-Fi, give the Mac's Wi-Fi a 100.x address from the range Tailscale uses, so the app also checks a saved 100.x address against the Mac and offers the Tailscale address when the two differ. When a `.local` name or a private address does not answer, the error says that the address works only on the Mac's own network and to use the Tailscale address away from it.
 
 ### Guides
 

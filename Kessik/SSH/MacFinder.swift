@@ -165,11 +165,13 @@ final class MacFinder {
 
 /// Asks the Mac for its Tailscale IPv4 address, so a Mac found on Wi-Fi also works away from home.
 enum TailscaleAddress {
-    /// The CLI inside the Mac app, then one on PATH. If neither answers, any interface with a 100.x address.
+    /// The CLI inside the Mac app, then one on PATH. If neither answers, a 100.x address on a `utun`
+    /// interface, where Tailscale puts its own. Only `utun`, because some networks, such as campus
+    /// Wi-Fi, give the Wi-Fi interface a 100.x address too, and that one works on that network only.
     static let command = #"export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; "#
         + #"ts=/Applications/Tailscale.app/Contents/MacOS/Tailscale; [ -x "$ts" ] || ts=$(command -v tailscale); "#
         + #"[ -n "$ts" ] && "$ts" ip -4 2>/dev/null; "#
-        + #"ifconfig 2>/dev/null | awk '/inet 100\./ {print $2}'; true"#
+        + #"for i in $(ifconfig -l 2>/dev/null); do case $i in utun*) ifconfig "$i" | awk '/inet 100\./ {print $2}';; esac; done; true"#
 
     /// The first line in Tailscale's range, 100.64.0.0/10.
     static func parse(_ output: String) -> String? {
@@ -179,13 +181,31 @@ enum TailscaleAddress {
     }
 
     static func isTailscale(_ address: String) -> Bool {
-        let parts = address.split(separator: ".", omittingEmptySubsequences: false).map { UInt8($0) }
-        guard parts.count == 4, !parts.contains(nil) else { return false }
-        return parts[0] == 100 && (64...127).contains(parts[1]!)
+        guard let parts = ipv4(address) else { return false }
+        return parts[0] == 100 && (64...127).contains(parts[1])
     }
-}
 
-extension Host {
-    /// A Bonjour name, such as `my-mac.local`. It works only on the same Wi-Fi as the Mac.
-    var isLocalName: Bool { hostname.lowercased().hasSuffix(".local") }
+    /// A Bonjour name, such as `my-mac.local`, or a private or link-local IPv4 address. Each works
+    /// only on the Mac's own network, and Tailscale does not carry it.
+    static func isLanOnly(_ hostname: String) -> Bool {
+        if hostname.lowercased().hasSuffix(".local") { return true }
+        guard let parts = ipv4(hostname) else { return false }
+        switch (parts[0], parts[1]) {
+        case (10, _), (172, 16...31), (192, 168), (169, 254): return true
+        default: return false
+        }
+    }
+
+    /// True when the Mac's Tailscale address can replace `hostname`. A 100.x address counts too:
+    /// a network that hands out Tailscale's range makes it a Wi-Fi address, and only the Mac knows
+    /// which 100.x address is its Tailscale one.
+    static func mayBeLanOnly(_ hostname: String) -> Bool {
+        isLanOnly(hostname) || isTailscale(hostname)
+    }
+
+    private static func ipv4(_ address: String) -> [UInt8]? {
+        let fields = address.split(separator: ".", omittingEmptySubsequences: false)
+        let parts = fields.compactMap { UInt8($0) }
+        return fields.count == 4 && parts.count == 4 ? parts : nil
+    }
 }
