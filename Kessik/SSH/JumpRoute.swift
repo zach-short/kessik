@@ -52,13 +52,13 @@ enum LoginRoute {
         let hops = hops(to: host)
         let mac = hops[hops.count - 1]
         guard hops.count == 2, let jumpName = host.jump?.hostname else {
-            return try await SSHClient.connect(to: mac.settings(key: secrets.key, password: secrets.password, enclaveKey: secrets.enclaveKey))
+            return try await SSHClient.open(mac.settings(key: secrets.key, password: secrets.password, enclaveKey: secrets.enclaveKey))
         }
         let jumpHop = hops[0]
 
         let jump: SSHClient
         do {
-            jump = try await SSHClient.connect(to: jumpHop.settings(key: secrets.key, password: secrets.jumpPassword, enclaveKey: secrets.enclaveKey))
+            jump = try await SSHClient.open(jumpHop.settings(key: secrets.key, password: secrets.jumpPassword, enclaveKey: secrets.enclaveKey))
         } catch {
             throw HopFailure.wrap(error, role: .jumpHost, target: jumpHop.target, jumpName: jumpName)
         }
