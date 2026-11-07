@@ -14,9 +14,17 @@ enum JobStart {
     static let hook = "/Users/Shared/home-agent/bin/job-event"
 
     /// The arguments after `claude --remote-control <session>`: model, hooks, then the task as the first prompt.
+    /// `--` ends the options, so the task can never be read as a flag such as a second `--settings`.
     static func claudeArguments(for job: Assistant.JobSpec, home: String) throws -> [String] {
         try check(job, home: home)
-        return ["--model", job.model, "--settings", try settings(jobID: job.id), job.task]
+        return ["--model", job.model, "--settings", try settings(jobID: job.id), "--", job.task]
+    }
+
+    /// A first prompt that starts with `-` could be read as a flag, `/` runs a slash command and `!` runs
+    /// bash. The assistant refuses these too; this is the check on the side that runs the command.
+    static func startsUnsafe(_ task: String) -> Bool {
+        guard let first = task.trimmingCharacters(in: .whitespacesAndNewlines).first else { return true }
+        return first == "-" || first == "/" || first == "!"
     }
 
     static func check(_ job: Assistant.JobSpec, home: String) throws {
@@ -29,6 +37,7 @@ enum JobStart {
         guard !job.task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, job.task.count <= 4000 else {
             throw Rejected(reason: "the task is empty or too long")
         }
+        guard !startsUnsafe(job.task) else { throw Rejected(reason: "the task starts with -, / or !") }
     }
 
     /// Claude Code settings for one job: four hooks that report its state to the assistant.

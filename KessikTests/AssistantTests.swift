@@ -46,7 +46,7 @@ final class AssistantTests: XCTestCase {
         XCTAssertEqual(args[0], "--model")
         XCTAssertEqual(args[1], "opus")
         XCTAssertEqual(args[2], "--settings")
-        XCTAssertEqual(args.last, job.task)
+        XCTAssertEqual(Array(args.suffix(2)), ["--", job.task])
         let settings = try JSONSerialization.jsonObject(with: Data(args[3].utf8)) as? [String: Any]
         let hooks = settings?["hooks"] as? [String: Any]
         XCTAssertEqual(Set(hooks.map { Array($0.keys) } ?? []), ["UserPromptSubmit", "Stop", "Notification", "SessionEnd"])
@@ -63,6 +63,10 @@ final class AssistantTests: XCTestCase {
         bad = job; bad.path = "/etc"
         XCTAssertThrowsError(try JobStart.claudeArguments(for: bad, home: "/Users/me"))
         XCTAssertThrowsError(try JobStart.claudeArguments(for: job, home: ""))
+        for start in ["--settings={}", "  /delegate", "!rm -rf ~", "-p hi"] {
+            bad = job; bad.task = start
+            XCTAssertThrowsError(try JobStart.claudeArguments(for: bad, home: "/Users/me"), start)
+        }
     }
 
     func testJobStartQuotesTheTask() {
@@ -70,6 +74,7 @@ final class AssistantTests: XCTestCase {
         let args = try! JobStart.claudeArguments(for: risky, home: "/Users/me")
         let script = Tmux.startDetachedScript(name: risky.session, path: risky.path, claudeArguments: args)
         XCTAssertTrue(script.contains(#"claude --remote-control 'job-12' '--model' 'opus' '--settings'"#))
+        XCTAssertTrue(script.contains(#"'--' 'Fix it'"#))
         XCTAssertTrue(script.contains(#"'Fix it'\''; rm -rf ~; echo '\'''"#))
     }
 
