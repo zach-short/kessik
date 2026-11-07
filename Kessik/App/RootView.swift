@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case hosts, sessions, settings
+    case hosts, sessions, assistant, settings
 
     var id: String { rawValue }
 
@@ -9,6 +9,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .hosts: "Hosts"
         case .sessions: "Sessions"
+        case .assistant: "Assistant"
         case .settings: "Settings"
         }
     }
@@ -17,8 +18,14 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .hosts: "server.rack"
         case .sessions: "terminal"
+        case .assistant: "bubble.left.and.text.bubble.right"
         case .settings: "gearshape"
         }
+    }
+
+    /// The tabs to show. The Assistant tab needs the home assistant on the Mac, so Settings turns it on.
+    static func visible(assistant: Bool) -> [AppTab] {
+        allCases.filter { $0 != .assistant || assistant }
     }
 }
 
@@ -31,6 +38,9 @@ struct RootView: View {
     @Environment(MacLink.self) private var link
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = .hosts
+    @AppStorage(SettingsKey.assistantEnabled) private var assistantEnabled = false
+
+    private var tabs: [AppTab] { AppTab.visible(assistant: assistantEnabled) }
 
     /// A horizontal drag that ends far enough and fast enough moves one page.
     /// The vertical check keeps scrolling lists from changing pages.
@@ -40,7 +50,7 @@ struct RootView: View {
                 let dx = value.translation.width
                 let dy = value.translation.height
                 guard abs(dx) > abs(dy) * 2, abs(dx) > 80 else { return }
-                let pages = AppTab.allCases
+                let pages = tabs
                 guard let index = pages.firstIndex(of: tab) else { return }
                 let next = dx < 0 ? index + 1 : index - 1
                 guard pages.indices.contains(next) else { return }
@@ -57,6 +67,7 @@ struct RootView: View {
             switch tab {
             case .hosts: HostsView()
             case .sessions: SessionsView()
+            case .assistant: AssistantView()
             case .settings: SettingsView()
             }
         }
@@ -64,11 +75,15 @@ struct RootView: View {
         .simultaneousGesture(pageSwipe)
         .environment(\.showTab) { tab = $0 }
         .safeAreaInset(edge: .bottom) {
-            PillTabBar(selection: $tab)
+            PillTabBar(selection: $tab, tabs: tabs)
                 .padding(.bottom, 4)
         }
         // A socket can die in silence during sleep or a network switch. Check the Sessions link
         // then, and on a timer, so a dead Mac shows a message instead of a hang.
+        // Turning the Assistant off while on its tab moves to Settings, where the switch is.
+        .onChange(of: assistantEnabled) { _, on in
+            if !on, tab == .assistant { tab = .settings }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { link.checkAlive() }
         }
@@ -87,5 +102,6 @@ struct RootView: View {
     RootView()
         .environment(AppStore.preview)
         .environment(MacLink(host: AppStore.preview.hosts[0]))
+        .environment(AssistantLink())
         .preferredColorScheme(.dark)
 }

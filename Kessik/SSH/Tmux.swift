@@ -45,8 +45,8 @@ enum Tmux {
     /// because a plain SSH command has no `~/.local/bin` or other `PATH` entries from `.zshrc`, and the
     /// tmux server it may start would keep that short `PATH` for every later session. The login shell
     /// then hands the script to `sh`, so the script reads the same whatever the login shell is.
-    static func startDetachedCommand(name: String, path: String) -> String {
-        let script = startDetachedScript(name: name, path: path)
+    static func startDetachedCommand(name: String, path: String, claudeArguments: [String] = []) -> String {
+        let script = startDetachedScript(name: name, path: path, claudeArguments: claudeArguments)
         return #""${SHELL:-/bin/sh}" -ilc "# + quote("exec /bin/sh -c " + quote(script))
     }
 
@@ -56,7 +56,10 @@ enum Tmux {
     /// visitors to a folder whether they trust it. That question needs a person, so the marker says so.
     /// Claude Code v2.1.301 draws "Yes, I trust this folder" for that question and a "Claude Code v"
     /// banner once it is ready. A screen with neither after eight seconds counts as started.
-    static func startDetachedScript(name: String, path: String) -> String {
+    /// `claudeArguments` go after `--remote-control <name>`, each quoted, such as an assistant job's
+    /// model, hooks and first prompt.
+    static func startDetachedScript(name: String, path: String, claudeArguments: [String] = []) -> String {
+        let extra = claudeArguments.map { " " + quote($0) }.joined()
         let session = quote(name)
         let target = quote("=" + name)
         // capture-pane needs the trailing colon, or tmux reads `=name` as a pane and finds no session.
@@ -66,7 +69,7 @@ enum Tmux {
         asks() { case "$(tmux capture-pane -p -t \#(pane) 2>/dev/null)" in *"I trust this folder"*|*"trust the files in this folder"*) return 0;; esac; return 1; }
         if tmux has-session -t \#(target) 2>/dev/null; then
         if asks; then echo \#(trustMarker); else echo \#(runningMarker); fi; exit 0; fi
-        tmux new-session -d -s \#(session) -c \#(quote(path)) claude --remote-control \#(session)
+        tmux new-session -d -s \#(session) -c \#(quote(path)) claude --remote-control \#(session)\#(extra)
         i=0
         while [ $i -lt 16 ]; do
         sleep 0.5

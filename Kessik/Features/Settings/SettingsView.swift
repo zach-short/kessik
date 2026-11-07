@@ -16,6 +16,10 @@ enum SettingsKey {
     /// Raw value of the cursor shape. See `CursorShape`.
     static let cursorShape = "cursorShape"
     static let cursorBlink = "cursorBlink"
+    /// Shows the Assistant tab. Off by default: it needs the home assistant on the Mac.
+    static let assistantEnabled = "assistantEnabled"
+    /// The Mac user whose key is forced to the assistant command. See `AssistantLink`.
+    static let assistantUser = "assistantUser"
 }
 
 struct SettingsView: View {
@@ -96,6 +100,7 @@ struct SettingsView: View {
                     Text("Saved replies and commands you run with one tap.")
                 }
 
+                AssistantSection()
                 KeySection()
                 PasswordsSection()
                 LoginLockSection()

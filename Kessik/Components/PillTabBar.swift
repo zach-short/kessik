@@ -2,11 +2,12 @@ import SwiftUI
 
 struct PillTabBar: View {
     @Binding var selection: AppTab
+    var tabs: [AppTab] = AppTab.allCases
     @Namespace private var highlight
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(AppTab.allCases) { tab in
+            ForEach(tabs) { tab in
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                         selection = tab

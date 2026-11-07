@@ -4,6 +4,7 @@ import SwiftUI
 struct KessikApp: App {
     @State private var store: AppStore
     @State private var link: MacLink
+    @State private var assistant = AssistantLink()
     @State private var showSplash = true
     @AppStorage(SettingsKey.appearance) private var appearance = AppAppearance.dark
 
@@ -27,6 +28,7 @@ struct KessikApp: App {
             }
             .environment(store)
             .environment(link)
+            .environment(assistant)
             .preferredColorScheme(appearance.colorScheme)
             .tint(Theme.accent)
             .onChange(of: store.snippets) { _, snippets in SavedSnippets.save(snippets) }
