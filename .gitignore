@@ -4,3 +4,4 @@ DerivedData/
 build/
 *.xcodeproj/
 Config/Local.xcconfig
+.build/

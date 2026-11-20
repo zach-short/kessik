@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case hosts, sessions, assistant, settings
+    case hosts, sessions, remote, assistant, settings
 
     var id: String { rawValue }
 
@@ -9,6 +9,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .hosts: "Hosts"
         case .sessions: "Sessions"
+        case .remote: "Remote"
         case .assistant: "Assistant"
         case .settings: "Settings"
         }
@@ -18,14 +19,16 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .hosts: "server.rack"
         case .sessions: "terminal"
+        case .remote: "av.remote"
         case .assistant: "bubble.left.and.text.bubble.right"
         case .settings: "gearshape"
         }
     }
 
-    /// The tabs to show. The Assistant tab needs the home assistant on the Mac, so Settings turns it on.
-    static func visible(assistant: Bool) -> [AppTab] {
-        allCases.filter { $0 != .assistant || assistant }
+    /// The tabs to show. The Assistant tab needs the home assistant on the Mac and the Remote tab
+    /// needs Kessik Remote on the Mac, so Settings turns each one on.
+    static func visible(assistant: Bool, remote: Bool = false) -> [AppTab] {
+        allCases.filter { ($0 != .assistant || assistant) && ($0 != .remote || remote) }
     }
 }
 
@@ -39,8 +42,9 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = .hosts
     @AppStorage(SettingsKey.assistantEnabled) private var assistantEnabled = false
+    @AppStorage(SettingsKey.remoteEnabled) private var remoteEnabled = false
 
-    private var tabs: [AppTab] { AppTab.visible(assistant: assistantEnabled) }
+    private var tabs: [AppTab] { AppTab.visible(assistant: assistantEnabled, remote: remoteEnabled) }
 
     /// A horizontal drag that ends far enough and fast enough moves one page.
     /// The vertical check keeps scrolling lists from changing pages.
@@ -67,12 +71,14 @@ struct RootView: View {
             switch tab {
             case .hosts: HostsView()
             case .sessions: SessionsView()
+            case .remote: RemoteView()
             case .assistant: AssistantView()
             case .settings: SettingsView()
             }
         }
-        // Swipe left or right to move to the next or previous page.
-        .simultaneousGesture(pageSwipe)
+        // Swipe left or right to move to the next or previous page. Not on the Remote tab, where a
+        // sideways drag moves the Mac's pointer.
+        .simultaneousGesture(pageSwipe, including: tab == .remote ? .subviews : .all)
         .environment(\.showTab) { tab = $0 }
         .safeAreaInset(edge: .bottom) {
             PillTabBar(selection: $tab, tabs: tabs)
@@ -83,6 +89,9 @@ struct RootView: View {
         // Turning the Assistant off while on its tab moves to Settings, where the switch is.
         .onChange(of: assistantEnabled) { _, on in
             if !on, tab == .assistant { tab = .settings }
+        }
+        .onChange(of: remoteEnabled) { _, on in
+            if !on, tab == .remote { tab = .settings }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { link.checkAlive() }
@@ -103,5 +112,6 @@ struct RootView: View {
         .environment(AppStore.preview)
         .environment(MacLink(host: AppStore.preview.hosts[0]))
         .environment(AssistantLink())
+        .environment(RemoteLink())
         .preferredColorScheme(.dark)
 }

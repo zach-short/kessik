@@ -9,6 +9,7 @@
 #   kessik log               the tail of the last phone build log
 #   kessik archive           archive Release for App Store Connect (--upload to send it)
 #   kessik deploy            build the website in site/ and publish it to Cloudflare Pages
+#   kessik remote            build Kessik Remote on this Mac and start it (--login to start at login)
 #   kessik shell             print the three lines that go in ~/.zshrc
 #
 # This file only wraps the commands; the build settings live in project.yml and Config/.
@@ -110,6 +111,72 @@ cmd_deploy() {
   printf '\n%sThe site is published.%s\n' "$D" "$O"
 }
 
+# Kessik Remote is the Mac side of the Remote tab. It is a Swift package, so this needs only the
+# Command Line Tools, not Xcode. KESSIK_REMOTE_DIR picks the folder the app goes in.
+cmd_remote() {
+  local dir="${KESSIK_REMOTE_DIR:-$HOME/Applications}" label="${KESSIK_REMOTE_LABEL:-com.kessik.remote}"
+  local app bin plist login=0
+  [[ "${1:-}" == "--login" ]] && login=1
+  app="$dir/Kessik Remote.app"
+  plist="$HOME/Library/LaunchAgents/$label.plist"
+
+  say "Building Kessik Remote"
+  swift build -c release --package-path "$ROOT/Remote"
+  bin="$(swift build -c release --package-path "$ROOT/Remote" --show-bin-path)/KessikRemote"
+  [[ -x "$bin" ]] || die "the build left no binary at $bin"
+
+  say "Installing to $app"
+  [[ -f "$plist" ]] && launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+  pkill -x KessikRemote 2>/dev/null || true
+  rm -rf "$app"
+  mkdir -p "$app/Contents/MacOS"
+  cp "$bin" "$app/Contents/MacOS/KessikRemote"
+  cat > "$app/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key><string>com.kessik.remote</string>
+	<key>CFBundleName</key><string>Kessik Remote</string>
+	<key>CFBundleDisplayName</key><string>Kessik Remote</string>
+	<key>CFBundleExecutable</key><string>KessikRemote</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>1.0</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>LSMinimumSystemVersion</key><string>13.0</string>
+	<key>LSUIElement</key><true/>
+</dict>
+</plist>
+PLIST
+  # An ad hoc signature. macOS ties the Accessibility permission to it, so a rebuilt app must be
+  # removed from the Accessibility list and allowed again.
+  codesign --force --sign - --identifier com.kessik.remote "$app"
+
+  if (( login )); then
+    say "Starting at login ($plist)"
+    mkdir -p "$HOME/Library/LaunchAgents"
+    cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>$label</string>
+	<key>ProgramArguments</key><array><string>$app/Contents/MacOS/KessikRemote</string></array>
+	<key>RunAtLoad</key><true/>
+	<key>KeepAlive</key><true/>
+	<key>LimitLoadToSessionType</key><string>Aqua</string>
+</dict>
+</plist>
+PLIST
+    launchctl bootstrap "gui/$(id -u)" "$plist"
+  elif [[ -f "$plist" ]]; then
+    launchctl bootstrap "gui/$(id -u)" "$plist"
+  else
+    open "$app"
+  fi
+  printf '\n%sKessik Remote is in the menu bar. Allow it in System Settings > Privacy & Security > Accessibility.%s\n' "$D" "$O"
+}
+
 cmd_shell() {
   cat <<SNIPPET
 # kessik: the app's own commands, from anywhere. \`kessik\` alone prints the menu.
@@ -129,6 +196,7 @@ ${B}kessik${O}  the Kessik app
   log       the tail of the last phone build log
   archive   archive Release for App Store Connect (--upload to send it)
   deploy    build the website in site/ and publish it to Cloudflare Pages
+  remote    build Kessik Remote on this Mac and start it (--login to start at login)
   shell     print the three lines that go in ~/.zshrc
   help      this menu
 
@@ -143,6 +211,7 @@ case "${1:-help}" in
   log)   shift; cmd_log "$@" ;;
   archive) shift; exec "$ROOT/scripts/archive.sh" "$@" ;;
   deploy) shift; cmd_deploy "$@" ;;
+  remote) shift; cmd_remote "$@" ;;
   shell) shift; cmd_shell ;;
   help|-h|--help) menu ;;
   *)     printf 'kessik: no command %s\n\n' "$1" >&2; menu >&2; exit 1 ;;

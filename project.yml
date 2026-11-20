@@ -32,6 +32,9 @@ targets:
     platform: iOS
     sources:
       - Kessik
+      # The lines the Remote tab and Kessik Remote on the Mac send each other. The Mac helper is
+      # the Swift package in Remote/, which builds without Xcode, and this folder is its library.
+      - Remote/Sources/RemoteWire
       # What changed in each version. One copy at the root of the repo, bundled here and
       # imported by the site, so the app and kessik.com cannot disagree about a release.
       - path: release-notes.json

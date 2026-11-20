@@ -2,7 +2,7 @@
 
 Kessik is an iPhone app that opens Claude Code on a Mac over SSH. It starts each Claude Code session inside tmux, so the session keeps running on the Mac when the phone locks, loses signal or closes the terminal. The phone attaches to the same session later.
 
-The app is written in SwiftUI. It uses [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for the terminal view and [Citadel](https://github.com/orlandos-nl/Citadel) for the SSH client. It has no server part: the Mac needs only Remote Login, tmux and Claude Code.
+The app is written in SwiftUI. It uses [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for the terminal view and [Citadel](https://github.com/orlandos-nl/Citadel) for the SSH client. The terminal has no server part: the Mac needs only Remote Login, tmux and Claude Code. The optional Remote tab needs one small menu bar app on the Mac, Kessik Remote, which is in this repository.
 
 ## What it does
 
@@ -46,6 +46,14 @@ iOS can end a socket without telling the app. The app checks the connection when
 
 In Settings, the app searches the current Wi-Fi for Macs that have Remote Login on, using Bonjour. A `.local` name or a private Wi-Fi address, such as `192.168.1.20`, works on that Wi-Fi only. After a login to such an address, the app asks the Mac for its Tailscale address and offers to switch to it, because that address works on any network while [Tailscale](https://tailscale.com) is on for both devices. The app reads the address from the Tailscale command line tool, or from the Mac's `utun` interfaces when the tool does not answer. Some networks, such as campus Wi-Fi, give the Mac's Wi-Fi a 100.x address from the range Tailscale uses, so the app also checks a saved 100.x address against the Mac and offers the Tailscale address when the two differ. When a `.local` name or a private address does not answer, the error says that the address works only on the Mac's own network and to use the Tailscale address away from it. The app connects to a Tailscale address (100.64.0.0/10) as it is, without the system resolver. On an IPv6-only cellular network, such as T-Mobile's, the resolver turns an IPv4 address into a NAT64 IPv6 address, which goes out over cellular and not through Tailscale, so the Mac never sees the connection.
 
+### Remote
+
+The Remote tab is a remote control for a Mac that is connected to a TV or a monitor. Settings > Remote turns the tab on. The large pad has two modes. In Pointer mode it is a trackpad: one finger moves the pointer, a tap clicks, two fingers scroll, a tap with two fingers is a right click, and a touch held for half a second starts a drag. In D-pad mode it shows four arrow keys and OK, which sends Return, and a held arrow repeats. Below the pad, Back sends Command-[, Home opens Mission Control and Search opens Spotlight and the phone keyboard, so typing the name of an app and Return starts it. Two more rows hold volume down, mute and volume up, and previous, play or pause and next. The power button at the top left puts the display to sleep, or wakes it when it is asleep. The Mac itself stays on. The keyboard button at the top right opens the phone keyboard, and each key goes to the Mac as it is typed.
+
+The Mac side is Kessik Remote, a menu bar app in `Remote/`. It is a Swift package, so it builds with the Command Line Tools and the Mac does not need Xcode. On the Mac, run `scripts/kessik remote`. The command builds the app, puts it in `~/Applications` (or the folder in `KESSIK_REMOTE_DIR`) and opens it, and `scripts/kessik remote --login` also adds a launch agent that starts it at login. The first launch asks for the Accessibility permission, because macOS lets only an allowed app send pointer and keyboard events. Turn Kessik Remote on in System Settings > Privacy & Security > Accessibility. Until then the Remote tab says that the Mac ignores the remote. The app has an ad hoc signature, and macOS ties the permission to that signature, so after a rebuild remove Kessik Remote from the Accessibility list and allow it again.
+
+Kessik Remote listens on port 47815 on the Mac's loopback address only, so nothing on the network can reach it. The phone opens a channel to that port through the SSH connection the Sessions tab already has, the same way Preview a port does. The remote therefore works wherever the SSH login works, including over Tailscale, and it needs no new network permission on the phone. Kessik Remote also saves a random token in `~/Library/Application Support/KessikRemote/token`, readable by the Mac user only. The phone reads the token over SSH and sends it first, and Kessik Remote closes a connection that sends a different one, so another program or another user on the Mac cannot use the port to send input. The remote does not work at the Mac's login window, because Kessik Remote starts only after a user logs in.
+
 ### Guides
 
 Four guides are built into the app, in Settings > Guides and behind the How to connect button in the Sessions tab. They cover connecting to a Mac, logging in without a password, setting up Claude Code on the Mac and using the terminal. Each guide ends with fixes for the errors the app shows.
@@ -64,7 +72,7 @@ The Mac needs three things:
 2. [tmux](https://github.com/tmux/tmux), installed with Homebrew: `brew install tmux`. The app looks for it in `/opt/homebrew/bin` and `/usr/local/bin`.
 3. [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), installed with `curl -fsSL https://claude.ai/install.sh | bash` and signed in once by running `claude` in Terminal.
 
-Tailscale is optional. It is the way to reach the Mac away from home.
+Tailscale is optional. It is the way to reach the Mac away from home. Kessik Remote is optional too, and only the Remote tab needs it.
 
 ## Build and run
 
@@ -100,7 +108,7 @@ Citadel is pinned to 0.12.0 because version 0.12.1 moved NIOSSH to a third-party
 
 ## Project layout
 
-`Kessik/SSH` holds the connection code: the SSH session, the tmux commands and their parsers, the Keychain wrappers, the host key store, the Bonjour search and the network monitor. `Kessik/Features` holds one folder per screen area: Hosts, Sessions, Terminal, Settings and Guides. `Kessik/Components` holds shared views, and `Kessik/Theme` holds colors and fonts. The guide text lives in `Kessik/Features/Guides/Guides.swift` and must match the labels and error messages the app shows.
+`Kessik/SSH` holds the connection code: the SSH session, the tmux commands and their parsers, the Keychain wrappers, the host key store, the Bonjour search and the network monitor. `Kessik/Features` holds one folder per screen area: Hosts, Sessions, Terminal, Remote, Assistant, Settings and Guides. `Remote/` is the Swift package for Kessik Remote on the Mac. Its `Sources/RemoteWire` folder defines the lines the phone and the Mac send each other, and the iPhone target compiles the same folder, so the two sides cannot disagree. `Kessik/Components` holds shared views, and `Kessik/Theme` holds colors and fonts. The guide text lives in `Kessik/Features/Guides/Guides.swift` and must match the labels and error messages the app shows.
 
 The two Lottie files in `Kessik/Resources/Animations` are generated. Edit `Tools/make_animations.py` and run `python3 Tools/make_animations.py` to rewrite them. Do not edit the JSON by hand.
 

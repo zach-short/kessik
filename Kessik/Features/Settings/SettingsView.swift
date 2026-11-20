@@ -20,6 +20,10 @@ enum SettingsKey {
     static let assistantEnabled = "assistantEnabled"
     /// The Mac user whose key is forced to the assistant command. See `AssistantLink`.
     static let assistantUser = "assistantUser"
+    /// Shows the Remote tab. Off by default: it needs Kessik Remote on the Mac.
+    static let remoteEnabled = "remoteEnabled"
+    /// Raw value of the pad mode in the Remote tab. See `RemotePad`.
+    static let remotePad = "remotePad"
 }
 
 struct SettingsView: View {
@@ -100,6 +104,7 @@ struct SettingsView: View {
                     Text("Saved replies and commands you run with one tap.")
                 }
 
+                RemoteSection()
                 AssistantSection()
                 KeySection()
                 PasswordsSection()
