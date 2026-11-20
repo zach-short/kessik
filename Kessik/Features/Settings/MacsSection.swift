@@ -20,14 +20,15 @@ struct MacsSection: View {
                 .onDelete { offsets in
                     pendingDelete = offsets.first.map { store.hosts[$0] }
                 }
+                // On one row, not on the Section, so only one view presents each sheet.
                 Button("Add Mac", systemImage: "plus") { adding = true }
+                    .sheet(item: $editing) { host in MacFormSheet(editing: host) }
+                    .sheet(isPresented: $adding) { MacFormSheet(editing: nil) }
             } header: {
                 Text("Macs")
             } footer: {
                 Text(footer)
             }
-            .sheet(item: $editing) { host in MacFormSheet(editing: host) }
-            .sheet(isPresented: $adding) { MacFormSheet(editing: nil) }
             .confirmationDialog("Delete \(pendingDelete?.name ?? "Mac")?", isPresented: deleting,
                                 titleVisibility: .visible, presenting: pendingDelete) { host in
                 Button("Delete", role: .destructive) { delete(host) }
@@ -158,7 +159,11 @@ private struct MacForm: View {
 
     var body: some View {
         Section {
+            // The sheet hangs on this one row. A modifier on the Section goes to each of its rows,
+            // so every row would present the same sheet, and the sheet closes when the list drops
+            // the row that won, as it does when the keyboard hides.
             Button("Find Macs on this Wi-Fi", systemImage: "wifi") { finding = true }
+                .sheet(isPresented: $finding) { MacFinderSheet(onPick: fill) }
             field("Name", prompt: "Mac", text: $name)
             field("Hostname", prompt: "mac.tailnet.ts.net", text: $hostname, keyboard: .URL)
                 // Not on a single key typed or deleted, or the field would be cut to the host while
@@ -185,7 +190,6 @@ private struct MacForm: View {
             Text(LocalizedStringKey(footer))
         }
         .onAppear(perform: load)
-        .sheet(isPresented: $finding) { MacFinderSheet(onPick: fill) }
     }
 
     /// Bonjour gives the name, hostname and port. The username stays as typed.
