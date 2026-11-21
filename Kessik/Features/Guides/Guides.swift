@@ -119,8 +119,8 @@ extension Guide {
             Step(title: "Install Claude Code",
                  text: "Run the installer. Then run `claude` once in Terminal to sign in.",
                  command: "curl -fsSL https://claude.ai/install.sh | bash"),
-            Step(title: "Put repos in ~/Projects",
-                 text: "The folder list shows the folders in `~/Projects` on the Mac, newest first. For another folder, type its path, such as `~/code/app`."),
+            Step(title: "Put repos in ~/Developer or ~/Projects",
+                 text: "The folder list shows the folders in `~/Developer/<owner>/` and `~/Projects` on the Mac, newest first, such as `~/Developer/me/app`. For another folder, type its path, such as `~/code/app`."),
             Step(title: "Start a session",
                  text: "In the Sessions tab, tap New Claude session and pick a folder. The session starts on the Mac in the background, in a tmux session with the folder's name, with Remote Control on. The first time Claude Code opens a folder it asks whether you trust it, and the terminal opens so you can answer. To run another command in its place, such as `codex`, set Start command in the Mac's settings. The terminal then opens at once.",
                  opens: .sessions),
@@ -138,7 +138,7 @@ extension Guide {
                 fix: "The Mac could not run `claude`. Run `claude` once in Terminal on the Mac to check it works and is signed in. The installer puts it in `~/.local/bin`, so add that folder to PATH in `~/.zshrc`."),
             Fix(problem: "The session is not in the Claude app",
                 fix: "Remote Control needs a claude.ai login on the Mac (Pro, Max, Team or Enterprise), not an API key. Claude Code may also be waiting for an answer. Tap the session in the Sessions tab to open the terminal and look for the question or the error. Run `/login` in Claude Code to sign in with claude.ai."),
-            Fix(problem: "\"No folders in ~/Projects\"",
+            Fix(problem: "\"No folders in ~/Developer or ~/Projects\"",
                 fix: "Make the folder on the Mac, or type a full path in the folder list."),
         ]
     )

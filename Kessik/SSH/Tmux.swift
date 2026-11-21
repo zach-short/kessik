@@ -14,8 +14,24 @@ enum Tmux {
         + "tmux ls -F '#{session_windows}:#{session_attached}:#{session_created}:#{session_name}:#{session_path}' 2>/dev/null; "
         + "true"
 
-    /// First line is $HOME, then the folders in ~/Projects, most recently changed first.
-    static let projectsCommand = #"echo "$HOME"; cd "$HOME/Projects" 2>/dev/null && ls -1tp | grep '/$'; true"#
+    /// First line is $HOME, then the full path of each folder a session can start in, most recently
+    /// changed first: each folder in ~/Developer/<owner>/, a repo at ~/Developer/<name> itself, and each
+    /// folder in ~/Projects. `/bin/sh` runs it, because zsh, the Mac's usual login shell, stops the whole
+    /// command at a glob that matches nothing, such as ~/Projects/*/ on a Mac with no ~/Projects.
+    static let projectsScript = #"""
+        echo "$HOME"
+        for d in "$HOME"/Developer/*/ "$HOME"/Projects/*/; do
+          d=${d%/}; [ -d "$d" ] || continue
+          case "$d" in
+            "$HOME"/Developer/*)
+              if [ -e "$d/.git" ]; then echo "$d"
+              else for s in "$d"/*/; do [ -d "$s" ] && echo "${s%/}"; done; fi ;;
+            *) echo "$d" ;;
+          esac
+        done | while IFS= read -r p; do stat -f '%m %N' "$p"; done | sort -rn | cut -d ' ' -f 2-
+        true
+        """#
+    static let projectsCommand = "/bin/sh -c " + quote(projectsScript)
 
     static func killCommand(_ name: String) -> String {
         pathPrefix + "tmux kill-session -t \(quote("=" + name))"
@@ -151,7 +167,7 @@ enum Tmux {
         var lines = output.split(separator: "\n").map(String.init)
         guard !lines.isEmpty else { return nil }
         let home = lines.removeFirst()
-        let folders = lines.map { home + "/Projects/" + $0.dropLast() }
+        let folders = lines.filter { $0.hasPrefix(home + "/") }
         return Projects(home: home, folders: folders)
     }
 

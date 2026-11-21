@@ -7,7 +7,7 @@
 # Output lands in build/store-shots/ (gitignored). Upload the .jpg files: App Store Connect
 # rejects images with an alpha channel, which Chrome's PNGs carry.
 #
-# Ported from ~/Projects/furlough/scripts/store-shots.sh, without the iPad slot: Kessik is an
+# Ported from ~/Developer/zach-short/furlough/scripts/store-shots.sh, without the iPad slot: Kessik is an
 # iPhone app. A frame with no capture in design/store/raw/ draws a placeholder, and a
 # placeholder must never be uploaded, so the script says which frames still have one.
 set -euo pipefail

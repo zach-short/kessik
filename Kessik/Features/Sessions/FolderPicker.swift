@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Lists the folders in ~/Projects on the Mac, newest first. Typing a path that starts with `~` or `/` uses it as is.
+/// Lists the folders in ~/Developer/<owner>/ and ~/Projects on the Mac, newest first. Typing a path that starts with `~` or `/` uses it as is.
 struct FolderPicker: View {
     var link: MacLink
     var sessions: [TmuxSession]
@@ -31,14 +31,14 @@ struct FolderPicker: View {
                     } else if projects == nil {
                         ProgressView().frame(maxWidth: .infinity)
                     } else if filtered.isEmpty {
-                        Text(query.isEmpty ? "No folders in ~/Projects." : "No match.")
+                        Text(query.isEmpty ? "No folders in ~/Developer or ~/Projects." : "No match.")
                             .foregroundStyle(Theme.textSecondary)
                     }
                     ForEach(filtered, id: \.self) { path in
                         Button { onPick(path) } label: { row(path) }
                     }
                 } header: {
-                    Text("~/Projects")
+                    Text("~/Developer and ~/Projects")
                 }
                 .listRowBackground(Theme.surface)
             }
@@ -65,8 +65,13 @@ struct FolderPicker: View {
         return HStack(spacing: 12) {
             Image(systemName: "folder")
                 .foregroundStyle(Theme.textSecondary)
-            Text((path as NSString).lastPathComponent)
-                .foregroundStyle(Theme.textPrimary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text((path as NSString).lastPathComponent)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(Tmux.tilde((path as NSString).deletingLastPathComponent, home: projects?.home))
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+            }
             Spacer()
             if running {
                 Text("running")
@@ -84,7 +89,7 @@ struct FolderPicker: View {
         guard let projects else { return [] }
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty, typedPath == nil else { return projects.folders }
-        return projects.folders.filter { ($0 as NSString).lastPathComponent.localizedCaseInsensitiveContains(q) }
+        return projects.folders.filter { Tmux.tilde($0, home: projects.home).localizedCaseInsensitiveContains(q) }
     }
 
     /// The query as an absolute path, when it looks like one.

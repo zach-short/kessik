@@ -132,6 +132,29 @@ final class DetachedStartTests: XCTestCase {
     // MARK: Helpers
 
     /// Reads one single-quoted shell word back to its text.
+    // MARK: The folder list
+
+    func testProjectsParseKeepsFullPathsUnderHome() {
+        let out = "/Users/me\n/Users/me/Developer/zach-short/kessik\n/Users/me/Projects/app\n/tmp/evil\n"
+        let parsed = Tmux.parseProjects(out)
+        XCTAssertEqual(parsed?.home, "/Users/me")
+        XCTAssertEqual(parsed?.folders, ["/Users/me/Developer/zach-short/kessik", "/Users/me/Projects/app"])
+    }
+
+    func testProjectsParseWithNoFoldersIsEmpty() {
+        XCTAssertEqual(Tmux.parseProjects("/Users/me\n")?.folders, [])
+        XCTAssertNil(Tmux.parseProjects(""))
+    }
+
+    /// zsh stops the whole command at a glob that matches nothing, so both lists run in `/bin/sh`.
+    func testFolderAndRepoCommandsRunInSh() {
+        for command in [Tmux.projectsCommand, JobStart.reposCommand] {
+            XCTAssertTrue(command.hasPrefix("/bin/sh -c '"), command)
+            XCTAssertTrue(command.contains(#""$HOME"/Developer/*/"#), command)
+            XCTAssertTrue(command.contains(#""$HOME"/Projects/*/"#), command)
+        }
+    }
+
     private func unquote(_ word: String) -> String {
         XCTAssertTrue(word.hasPrefix("'") && word.hasSuffix("'"), "not one quoted word: \(word)")
         return String(word.dropFirst().dropLast()).replacingOccurrences(of: #"'\''"#, with: "'")

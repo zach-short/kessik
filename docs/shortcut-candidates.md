@@ -4,7 +4,7 @@ Source: a read-only Haiku scan of `~/.claude/projects` and `~/.claude/history.js
 
 ## What the transcripts show
 
-Every project lives under `~/Projects`. Nothing runs from `~/Downloads`, so the folder picker should default to `~/Projects`. The busiest projects are ezhomesteading (346 sessions), personal-config (128), buy-in (92), emoney (58), usdeed (56) and felto (47).
+Every project lives under `~/Developer/<owner>/` (under `~/Projects` until 2026-11-21). Nothing runs from `~/Downloads`, so the folder picker should default to `~/Developer`. The busiest projects are ezhomesteading (346 sessions), personal-config (128), buy-in (92), emoney (58), usdeed (56) and felto (47).
 
 The most common replies inside a session are "continue" (61 exact), "yes" (33), "remove comments" (14) and "commit this" (13). Common session openers are "delegate next item in passoff", "whats next" and "complete the next opus task". Inside Claude, `/model`, `/clear` and `/usage` are the most used slash commands.
 
@@ -14,9 +14,9 @@ Dev servers almost never appear as Bash calls. The common checks are `bun run ty
 
 | Label | Command or text | Kind |
 |---|---|---|
-| Claude in ezhomesteading | `tmux new -A -s ezh -c ~/Projects/ezhomesteading claude` | new or attach |
-| Claude in personal-config | `tmux new -A -s pc -c ~/Projects/personal-config claude` | new or attach |
-| Claude in buy-in | `tmux new -A -s buyin -c ~/Projects/buy-in claude` | new or attach |
+| Claude in ezhomesteading | `tmux new -A -s ezh -c ~/Developer/dan-short/ezhomesteading claude` | new or attach |
+| Claude in personal-config | `tmux new -A -s pc -c ~/Developer/zach-short/personal-config claude` | new or attach |
+| Claude in buy-in | `tmux new -A -s buyin -c ~/Developer/zach-short/buy-in claude` | new or attach |
 | Session list | `tmux ls` | shell |
 | Continue | `continue` + Return | text into live session |
 | Yes | `yes` + Return | text into live session |

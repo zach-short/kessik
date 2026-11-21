@@ -57,9 +57,10 @@ enum JobStart {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// The git repos the assistant may hand work to: folders in ~/Developer/<org>/ and ~/Projects that hold `.git`.
-    /// First line is $HOME.
-    static let reposCommand = #"echo "$HOME"; for d in "$HOME"/Developer/*/*/.git "$HOME"/Projects/*/.git; do [ -e "$d" ] && echo "${d%/.git}"; done; true"#
+    /// The git repos the assistant may hand work to: folders in ~/Developer/<org>/, ~/Developer and ~/Projects
+    /// that hold `.git`. First line is $HOME. `/bin/sh` runs it, because zsh stops the whole loop at a glob
+    /// that matches nothing, such as ~/Projects/*/.git on a Mac with no ~/Projects.
+    static let reposCommand = "/bin/sh -c " + Tmux.quote(#"echo "$HOME"; for d in "$HOME"/Developer/*/*/.git "$HOME"/Developer/*/.git "$HOME"/Projects/*/.git; do [ -e "$d" ] && echo "${d%/.git}"; done; true"#)
 
     static func parseRepos(_ output: String) -> (home: String, repos: [[String: String]])? {
         var lines = output.split(separator: "\n").map(String.init)

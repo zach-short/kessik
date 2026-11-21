@@ -6,7 +6,7 @@
 #   scripts/archive.sh --upload     …and send it to App Store Connect
 #   BUILD=1234 scripts/archive.sh   pin the build number instead of stamping one
 #
-# Ported from ~/Projects/furlough/scripts/archive.sh, without the Screen Time checks that only
+# Ported from ~/Developer/zach-short/furlough/scripts/archive.sh, without the Screen Time checks that only
 # Furlough needs. It keeps the release-notes check: the newest entry in release-notes.json must be
 # the version in project.yml.
 #
